@@ -1,5 +1,0 @@
-package chat
-
-class Chat {
-
-}
