@@ -1,10 +1,8 @@
-package chat
+package chat.handlers
 
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, Props}
-
-//wrzuciłem tylko żeby móc odwołać się w hub'ie
 
 object ClientHandler {
   def props(remote: InetSocketAddress, connection: ActorRef): Props = ???

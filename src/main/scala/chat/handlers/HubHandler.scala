@@ -1,10 +1,10 @@
-package chat
+package chat.handlers
 
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
-import chat.ClientHandler._
+import chat.handlers.ClientHandler._
 
 import scala.collection.mutable
 

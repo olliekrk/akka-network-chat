@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
+import chat.handlers.HubHandler
 
 object ChatServer {
   //provide IP address and port number
