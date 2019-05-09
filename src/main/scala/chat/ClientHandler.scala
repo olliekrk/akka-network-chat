@@ -13,4 +13,6 @@ object ClientHandler {
 
   case class ChatMessage(senderName: String, message: String) extends ClientRequest
 
+  case class ChatNotification(message: String) extends ClientRequest
+
 }
