@@ -1,17 +1,24 @@
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorSystem, Props}
-import chat.ChatServer
+import chat.handlers.ClientHandler
+import chat.{ChatClient, ChatServer}
 
 object Main {
   val hostname = "localhost"
   val server_port = 8888
+  val serverAddress = new InetSocketAddress(hostname, server_port)
+  val actorSystemName = "chat_system"
 
-  def runAsClient(): Unit = println("todo: Run as client")
+  def runAsClient(): Unit = {
+    //todo: not sure if this should be there
+    val actorSystem = ActorSystem(actorSystemName)
+    val clientHandler = actorSystem.actorOf(Props[ClientHandler], "client_handler")
+    actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler), "client")
+  }
 
   def runAsServer(): Unit = {
-    val actorSystem = ActorSystem("chat_system")
-    val serverAddress = new InetSocketAddress(hostname, server_port)
+    val actorSystem = ActorSystem(actorSystemName)
     actorSystem.actorOf(ChatServer.props(serverAddress), "chat_server")
   }
 

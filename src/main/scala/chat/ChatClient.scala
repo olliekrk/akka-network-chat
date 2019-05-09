@@ -1,44 +1,56 @@
 package chat
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import java.net.InetSocketAddress
 
+import chat.handlers.ClientHandler.ChatNotification
+
 object ChatClient {
-  def props(remote: InetSocketAddress, replies: ActorRef) =
-    Props(new ChatClient(remote, replies))
+  def props(remote: InetSocketAddress, listener: ActorRef) =
+    Props(new ChatClient(remote, listener))
 }
 
-class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor {
+class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor with ActorLogging {
 
   import akka.io.Tcp._
   import context.system
+  import scala.concurrent.duration._
 
-  IO(Tcp) ! Connect(remote)
+  val connectionTimeout: FiniteDuration = 30.seconds
+  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
 
   override def receive: Receive = {
-    case CommandFailed(_: Connect) =>
+    case Tcp.CommandFailed(_: Connect) =>
+      listener ! ChatNotification("Tcp.Connect command has failed")
       context.stop(self)
 
-    case c@Connected(remote, local) =>
-      listener ! c
+    case Tcp.Connected(`remote`, _) =>
+      listener ! ChatNotification(s"Connected successfully to $remote")
       val connection = sender()
       connection ! Register(self)
       context.become(connectedReceive(connection))
+
+    case _ =>
+      log.info("Unknown")
   }
 
   def connectedReceive(connection: ActorRef): Receive = {
-    case data: ByteString =>
-      connection ! Write(data)
+    case ByteString =>
+      log.info("ByteString")
 
-    case CommandFailed(_: Write) =>
-      println("Fail")
+    case c@CommandFailed(_) =>
+      log.info("CommandFailed")
+      println(c)
 
-    case Received(data) =>
-      listener ! data
+    case Received(_) =>
+      log.info("Received")
 
-    case _: ConnectionClosed =>
-      context.stop(self)
+    case c: Tcp.ConnectionClosed =>
+      log.info(c.getErrorCause)
+
+    case _ =>
+      log.info("Unknown")
   }
 }
