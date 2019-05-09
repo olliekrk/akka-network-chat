@@ -8,18 +8,18 @@ object Main {
   val hostname = "localhost"
   val server_port = 8888
   val serverAddress = new InetSocketAddress(hostname, server_port)
+  val serverActorName = "chat_server"
   val actorSystemName = "chat_system"
 
   def runAsClient(): Unit = {
-    //todo: not sure if this should be there
     val actorSystem = ActorSystem(actorSystemName)
-    val clientHandler = actorSystem.actorOf(Props[ClientHandler], "client_handler")
-    actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler), "client")
+    val clientHandler = actorSystem.actorOf(Props[ClientHandler])
+    actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
   }
 
   def runAsServer(): Unit = {
     val actorSystem = ActorSystem(actorSystemName)
-    actorSystem.actorOf(ChatServer.props(serverAddress), "chat_server")
+    actorSystem.actorOf(ChatServer.props(serverAddress), serverActorName)
   }
 
   def main(args: Array[String]): Unit = try {

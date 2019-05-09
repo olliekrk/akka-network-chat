@@ -1,10 +1,10 @@
 package chat
 
+import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
-import java.net.InetSocketAddress
-
 import chat.handlers.ClientHandler.ChatNotification
 
 object ChatClient {
@@ -16,27 +16,29 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 
   import akka.io.Tcp._
   import context.system
+
   import scala.concurrent.duration._
 
   val connectionTimeout: FiniteDuration = 30.seconds
   IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
 
   override def receive: Receive = {
-    case Tcp.CommandFailed(_: Connect) =>
+    case c@Tcp.CommandFailed(_: Connect) =>
       listener ! ChatNotification("Tcp.Connect command has failed")
+      println(c)
       context.stop(self)
 
-    case Tcp.Connected(`remote`, _) =>
-      listener ! ChatNotification(s"Connected successfully to $remote")
+    case Tcp.Connected(`remote`, localAddress) =>
       val connection = sender()
       connection ! Register(self)
-      context.become(connectedReceive(connection))
+      context.become(connectedReceive(connection, localAddress))
+      log.info(s"Connected successfully to $remote as $localAddress")
 
     case _ =>
       log.info("Unknown")
   }
 
-  def connectedReceive(connection: ActorRef): Receive = {
+  def connectedReceive(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case ByteString =>
       log.info("ByteString")
 

@@ -2,7 +2,7 @@ package chat.handlers
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp
 import chat.ChatClient
 import chat.handlers.ClientHandler._
@@ -46,12 +46,10 @@ class HubHandler extends Actor with ActorLogging {
     case HubHandler.Register(remoteAddress, connection) =>
       log.info(s"Trying to register new client: $remoteAddress")
 
-      //todo: delegate Register to ChatClient so that it registers its own handler instead
-      //todo: not sure if this should be there too
-      val client = context.actorOf(ChatClient.props(remoteAddress, connection))
-      connection ! Tcp.Register(client)
+      //val clientHandler = context.actorOf(Props[ClientHandler])
+      //connection ! Tcp.Register(clientHandler)
 
-      activeConnections += (remoteAddress -> client)
+      activeConnections += (remoteAddress -> connection)
       clientsChatRooms += (remoteAddress -> new mutable.LinkedHashSet[String]())
       log.info(s"New chat client has been registered: $remoteAddress")
 
