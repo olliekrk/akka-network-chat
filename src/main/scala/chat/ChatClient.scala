@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import chat.handlers.ClientHandler.ChatNotification
+import chat.handlers.HubHandler
 
 object ChatClient {
   def props(remote: InetSocketAddress, listener: ActorRef) =
@@ -30,9 +31,13 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 
     case Tcp.Connected(`remote`, localAddress) =>
       val connection = sender()
+
+      // deciding who will receive data from the connection
       connection ! Register(self)
-      context.become(connectedReceive(connection, localAddress))
+
       log.info(s"Connected successfully to $remote as $localAddress")
+      connection ! Write(ByteString("ok im finally connected")) // works!
+      context.become(connectedReceive(connection, localAddress))
 
     case _ =>
       log.info("Unknown")
@@ -50,9 +55,11 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       log.info("Received")
 
     case c: Tcp.ConnectionClosed =>
+      println(c)
       log.info(c.getErrorCause)
 
-    case _ =>
+    case msg =>
+      listener ! msg
       log.info("Unknown")
   }
 }
