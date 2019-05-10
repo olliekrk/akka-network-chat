@@ -14,7 +14,12 @@ object Main {
   def runAsClient(): Unit = {
     val actorSystem = ActorSystem(actorSystemName)
     val clientHandler = actorSystem.actorOf(Props[ClientHandler])
-    actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
+    val currentActor = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
+
+
+    while(true){
+
+    }
   }
 
   def runAsServer(): Unit = {
