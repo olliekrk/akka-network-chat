@@ -15,7 +15,7 @@ object ClientHandler {
 
 class ClientHandler extends Actor with ActorLogging {
   override def receive: Receive = {
-    case ChatMessage => println("Message")
+    case ChatMessage(name, message) => println(s"Message from $name: $message")
     case ChatNotification(message) => println("Notification: " + message)
     case _ => println("Unknown")
   }

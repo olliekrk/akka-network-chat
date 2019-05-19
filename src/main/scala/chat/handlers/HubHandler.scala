@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp
+import akka.io.Tcp.Received
 import chat.ChatClient
 import chat.handlers.ClientHandler._
 
@@ -46,8 +47,8 @@ class HubHandler extends Actor with ActorLogging {
     case HubHandler.Register(remoteAddress, connection) =>
       log.info(s"Trying to register new client: $remoteAddress")
 
-      //val clientHandler = context.actorOf(Props[ClientHandler])
-      //connection ! Tcp.Register(clientHandler)
+      // deciding who will be handling data incoming from new connection
+      connection ! Tcp.Register(self)
 
       activeConnections += (remoteAddress -> connection)
       clientsChatRooms += (remoteAddress -> new mutable.LinkedHashSet[String]())
@@ -61,7 +62,8 @@ class HubHandler extends Actor with ActorLogging {
       }
       log.info(s"Chat client has been unregistered: $senderAddress")
 
-    case HubHandler.Broadcast(_, senderName, message) =>
+    case HubHandler.Broadcast(senderAddress, senderName, message) =>
+      log.info(s"Broadcasting message from $senderAddress ($senderName)")
       activeConnections.foreach {
         case (_, connection) => connection ! ChatMessage(senderName, message)
       }
@@ -145,5 +147,12 @@ class HubHandler extends Actor with ActorLogging {
 
     case _: HubHandler.HubRequest =>
       log.warning("Request handler not yet implemented")
+
+    case Received(data) =>
+      log.info("Received ByteString from 'Write'") // works!
+      println(data.decodeString("US-ASCII"))
+
+    case _ =>
+      log.info("Unknown")
   }
 }
