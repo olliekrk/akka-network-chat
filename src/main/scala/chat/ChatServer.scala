@@ -47,5 +47,6 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     case Connected(remote, local) =>
       log.info(s"Receiving connection from remote: $remote to the local address: $local")
       hub ! HubHandler.Register(remote, sender())
+      hub ! HubHandler.CreateRoom(remote, "default_room")
   }
 }

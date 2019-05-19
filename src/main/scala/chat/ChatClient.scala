@@ -52,10 +52,12 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       println(c)
 
     case Received(_) =>
+
       log.info("Received")
 
     case c: Tcp.ConnectionClosed =>
-      println(c)
+      println("right here")
+
       log.info(c.getErrorCause)
 
     case msg =>
