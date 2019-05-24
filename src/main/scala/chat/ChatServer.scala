@@ -38,7 +38,6 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     case CommandFailed(_: Bind) =>
       log.warning("Received fail message. Shutting down the chat server.")
       context stop self
-
     /*
       In order to activate the new connection a Register message
       must be sent to the connection actor, informing that one
@@ -46,7 +45,10 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     */
     case Connected(remote, local) =>
       log.info(s"Receiving connection from remote: $remote to the local address: $local")
-      hub ! HubHandler.Register(remote, sender())
       hub ! HubHandler.CreateRoom(remote, "default_room")
+      log.info("Created new default room")
+      hub ! HubHandler.Register(remote, sender())
+      log.info("sender registered to default room")
+
   }
 }

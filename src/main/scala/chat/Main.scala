@@ -16,8 +16,11 @@ object Main {
     implicit def system: ActorSystem = actorSystem
 
     val userInteraction = actorSystem.actorOf(Props[Interaction], "interaction")
+    println("Type in your name: ")
     while (true) {
-      userInteraction ! UserMessage(scala.io.StdIn.readLine())
+      val msg = scala.io.StdIn.readLine()
+      println("read msg: "+ msg)
+      userInteraction ! UserMessage(msg)
     }
   }
 

@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
-import chat.handlers.ClientHandler.ChatNotification
+import chat.handlers.ClientHandler.{ChatMessage, ChatNotification}
 import chat.handlers.HubHandler
 
 
@@ -79,6 +79,8 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 //  }
 //
   def connectedReceive(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+    case ChatMessage(senderName, message) =>
+      log.info("new message!!!!")
     case ByteString =>
       log.info("ByteString")
 
