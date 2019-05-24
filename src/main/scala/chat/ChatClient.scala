@@ -8,6 +8,15 @@ import akka.util.ByteString
 import chat.handlers.ClientHandler.ChatNotification
 import chat.handlers.HubHandler
 
+
+case class CurrentUserName(name: String)
+
+case class InputMessage(message: String)
+
+case class UserStartConnect()
+
+case class UserDisconnect()
+
 object ChatClient {
   def props(remote: InetSocketAddress, listener: ActorRef) =
     Props(new ChatClient(remote, listener))
@@ -17,32 +26,58 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 
   import akka.io.Tcp._
   import context.system
-
   import scala.concurrent.duration._
 
   val connectionTimeout: FiniteDuration = 30.seconds
-  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
+  //  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
 
   override def receive: Receive = {
-    case c@Tcp.CommandFailed(_: Connect) =>
-      listener ! ChatNotification("Tcp.Connect command has failed")
-      println(c)
-      context.stop(self)
+    case UserStartConnect() =>
+      IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
+      context.become(
+        {
+          case c@Tcp.CommandFailed(_: Connect) =>
+            listener ! ChatNotification("Tcp.Connect command has failed")
+            println(c)
+            context.stop(self)
 
-    case Tcp.Connected(`remote`, localAddress) =>
-      val connection = sender()
+          case Tcp.Connected(`remote`, localAddress) =>
+            val connection = sender()
 
-      // deciding who will receive data from the connection
-      connection ! Register(self)
+            // deciding who will receive data from the connection
+            connection ! Register(self)
 
-      log.info(s"Connected successfully to $remote as $localAddress")
-      connection ! Write(ByteString("ok im finally connected")) // works!
-      context.become(connectedReceive(connection, localAddress))
+            log.info(s"Connected successfully to $remote as $localAddress")
+            connection ! Write(ByteString("ok im finally connected")) // works!
+            context.become(connectedReceive(connection, localAddress))
 
-    case _ =>
-      log.info("Unknown")
+          case _ =>
+            log.info("Unknown")
+        }
+      )
+
   }
 
+//  override def receive: Receive = {
+//    case c@Tcp.CommandFailed(_: Connect) =>
+//      listener ! ChatNotification("Tcp.Connect command has failed")
+//      println(c)
+//      context.stop(self)
+//
+//    case Tcp.Connected(`remote`, localAddress) =>
+//      val connection = sender()
+//
+//      // deciding who will receive data from the connection
+//      connection ! Register(self)
+//
+//      log.info(s"Connected successfully to $remote as $localAddress")
+//      connection ! Write(ByteString("ok im finally connected")) // works!
+//      context.become(connectedReceive(connection, localAddress))
+//
+//    case _ =>
+//      log.info("Unknown")
+//  }
+//
   def connectedReceive(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case ByteString =>
       log.info("ByteString")
@@ -52,7 +87,6 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       println(c)
 
     case Received(_) =>
-
       log.info("Received")
 
     case c: Tcp.ConnectionClosed =>
