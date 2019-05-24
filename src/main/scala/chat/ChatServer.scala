@@ -2,12 +2,16 @@ package chat
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
+import chat.ChatServer.ClientHub
 import chat.handlers.HubHandler
 
 object ChatServer {
+
+
+  case class ClientHub(hub: ActorRef)
   //provide IP address and port number
   def props(address: InetSocketAddress): Props =
     Props(new ChatServer(address))
@@ -20,8 +24,8 @@ object ChatServer {
 class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
 
   import context.system
+  val hub: ActorRef = context.actorOf(Props[HubHandler])
 
-  private val hub = context.actorOf(Props[HubHandler])
 
   IO(Tcp) ! Bind(self, address)
 
@@ -48,7 +52,11 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
       hub ! HubHandler.CreateRoom(remote, "default_room")
       log.info("Created new default room")
       hub ! HubHandler.Register(remote, sender())
+      sender() ! ClientHub(hub)
+      println(sender())
       log.info("sender registered to default room")
 
+    case _ =>
+      log.info("sth here ? :<")
   }
 }

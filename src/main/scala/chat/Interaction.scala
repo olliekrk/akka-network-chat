@@ -1,5 +1,4 @@
 package chat
-
 import akka.actor.{Actor, ActorRef}
 case class UserMessage(string: String)
 
@@ -15,12 +14,13 @@ class Interaction  extends Actor {
     //starting from
     case UserMessage(name) =>
       println("Got name!" + name)
+      println(self)
       if (name != null) {
         client ! CurrentUserName(name)
         context.become({
-          case InputMessage(message) =>
+          case UserMessage(message) =>
             println("input message: " + message)
-            client ! InputMessage(message)
+            client ! UserMessage(message)
         })
       } else {
         println("Wrong name!")
