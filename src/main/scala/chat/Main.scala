@@ -1,8 +1,8 @@
+package chat
+
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorSystem, Props}
-import chat.handlers.ClientHandler
-import chat.{ChatClient, ChatServer}
 
 object Main {
   val hostname = "localhost"
@@ -13,12 +13,14 @@ object Main {
 
   def runAsClient(): Unit = {
     val actorSystem = ActorSystem(actorSystemName)
-    val clientHandler = actorSystem.actorOf(Props[ClientHandler])
-    val currentActor = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
+    implicit def system: ActorSystem = actorSystem
 
-
-    while(true){
-
+    val userInteraction = actorSystem.actorOf(Props[Interaction], "interaction")
+    println("Type in your name: ")
+    while (true) {
+      val msg = scala.io.StdIn.readLine()
+      println("read msg: "+ msg)
+      userInteraction ! UserMessage(msg)
     }
   }
 
