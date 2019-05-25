@@ -4,9 +4,12 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp
-import akka.io.Tcp.Received
+import akka.io.Tcp.{Received, Write}
+import akka.util.ByteString
 import chat.ChatClient
+import chat.Main.{hostname, server_port}
 import chat.handlers.ClientHandler._
+import chat.handlers.HubHandler.Broadcast
 
 import scala.collection.mutable
 
@@ -49,6 +52,7 @@ class HubHandler extends Actor with ActorLogging {
 
       // deciding who will be handling data incoming from new connection
       connection ! Tcp.Register(self)
+      println("register in hub: " + connection)
 
       activeConnections += (remoteAddress -> connection)
       clientsChatRooms += (remoteAddress -> new mutable.LinkedHashSet[String]())
@@ -65,7 +69,10 @@ class HubHandler extends Actor with ActorLogging {
     case HubHandler.Broadcast(senderAddress, senderName, message) =>
       log.info(s"Broadcasting message from $senderAddress ($senderName)")
       activeConnections.foreach {
-        case (_, connection) => connection ! ChatMessage(senderName, message)
+
+        case (_, connection) =>
+          println("sent to " + connection)
+          connection ! Write(ByteString("from:" + senderName + " " + message))
       }
 
     case HubHandler.CreateRoom(senderAddress, roomName) =>
@@ -150,7 +157,9 @@ class HubHandler extends Actor with ActorLogging {
 
     case Received(data) =>
       log.info("Received ByteString from 'Write'") // works!
+      val msg:String = data.decodeString("US-ASCII")
       println(data.decodeString("US-ASCII"))
+      self ! Broadcast(new InetSocketAddress(hostname, server_port), "whatever", msg)
 
     case _ =>
       log.info("Unknown")

@@ -13,13 +13,13 @@ class Interaction  extends Actor {
   override def receive: Receive = {
     //starting from
     case UserMessage(name) =>
-      println("Got name!" + name)
+//      println("Got name!" + name)
       println(self)
       if (name != null) {
         client ! CurrentUserName(name)
         context.become({
           case UserMessage(message) =>
-            println("input message: " + message)
+//            println("input message: " + message)
             client ! UserMessage(message)
         })
       } else {

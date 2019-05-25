@@ -12,6 +12,7 @@ object ChatServer {
 
 
   case class ClientHub(hub: ActorRef)
+
   //provide IP address and port number
   def props(address: InetSocketAddress): Props =
     Props(new ChatServer(address))
@@ -24,6 +25,7 @@ object ChatServer {
 class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
 
   import context.system
+
   val hub: ActorRef = context.actorOf(Props[HubHandler])
 
 
@@ -52,9 +54,16 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
       hub ! HubHandler.CreateRoom(remote, "default_room")
       log.info("Created new default room")
       hub ! HubHandler.Register(remote, sender())
-      sender() ! ClientHub(hub)
-      println(sender())
       log.info("sender registered to default room")
+
+      context.become({
+        case Connected(remote, local) =>
+          log.info(s"Receiving connection from remote: $remote to the local address: $local")
+          hub ! HubHandler.Register(remote, sender())
+          log.info("sender registered to default room")
+        case _ =>
+          log.info("sth here ? :<")
+      })
 
     case _ =>
       log.info("sth here ? :<")
