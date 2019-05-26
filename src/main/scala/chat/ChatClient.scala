@@ -33,7 +33,7 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 
 
   val connectionTimeout: FiniteDuration = 30.seconds
-  //  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
+  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
   var hub: ActorRef = _
 
   override def receive: Receive = {
@@ -53,11 +53,9 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
             connection ! Register(self)
 
             log.info(s"Connected successfully to $remote as $localAddress")
-//            connection ! Write(ByteString("ok im finally connected")) // works!
             context.become(connectedReceive(connection, localAddress))
 
           case ChatServer.ClientHub(got_hub) =>
-            log.info("got hub")
             hub = got_hub
           case _ =>
             log.info("Unknown 1 ")
@@ -66,29 +64,9 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
 
   }
 
-  //  override def receive: Receive = {
-  //    case c@Tcp.CommandFailed(_: Connect) =>
-  //      listener ! ChatNotification("Tcp.Connect command has failed")
-  //      println(c)
-  //      context.stop(self)
-  //
-  //    case Tcp.Connected(`remote`, localAddress) =>
-  //      val connection = sender()
-  //
-  //      // deciding who will receive data from the connection
-  //      connection ! Register(self)
-  //
-  //      log.info(s"Connected successfully to $remote as $localAddress")
-  //      connection ! Write(ByteString("ok im finally connected")) // works!
-  //      context.become(connectedReceive(connection, localAddress))
-  //
-  //    case _ =>
-  //      log.info("Unknown")
-  //  }
-  //
   def connectedReceive(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case CurrentUserName(name) =>
-//      log.info("in client: " + name)
+      //log.info("in client: " + name)
       context.become(chat(name, connection, localAddress))
 
     case _ =>
@@ -98,16 +76,14 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
   def chat(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case ChatMessage(senderName, message) =>
       log.info(senderName + ": " + message)
-    case UserMessage(message) =>
-//      log.info("got input msg: ", message)
 
-      // todo -> broadcast
+      // sends messages from input to all people in (for a while?) default hub
+    case UserMessage(message) =>
+      //      log.info("got input msg: ", message)
       println(self)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
-//      message_request("connection") = connection
       message_request("message") = message
-
       println("SERIALIZING!")
       message_request.serializeByteString match {
         case Success(value) =>
@@ -116,9 +92,9 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
           println("FAIL :<")
           throw exception
       }
-//
-//      connection ! Write(ByteString(message))
 
+
+      // getting message from hub
     case Received(data) =>
       println(data.decodeString("US-ASCII"))
   }
