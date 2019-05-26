@@ -10,10 +10,12 @@ object Main {
   val serverAddress = new InetSocketAddress(hostname, server_port)
   val serverActorName = "chat_server"
   val actorSystemName = "chat_system"
+  val actorSystem = ActorSystem(actorSystemName)
+  implicit def system: ActorSystem = actorSystem
 
   def runAsClient(): Unit = {
-    val actorSystem = ActorSystem(actorSystemName)
-    implicit def system: ActorSystem = actorSystem
+//    val actorSystem = ActorSystem(actorSystemName)
+
 
     val userInteraction = actorSystem.actorOf(Props[Interaction], "interaction")
     println("Type in your name: ")
@@ -25,7 +27,7 @@ object Main {
   }
 
   def runAsServer(): Unit = {
-    val actorSystem = ActorSystem(actorSystemName)
+
     actorSystem.actorOf(ChatServer.props(serverAddress), serverActorName)
   }
 

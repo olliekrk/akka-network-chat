@@ -2,15 +2,16 @@ package chat.handlers
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.io.Tcp
 import akka.io.Tcp.{Received, Write}
 import akka.util.ByteString
 import chat.ChatClient
-import chat.Main.{hostname, server_port}
+import chat.Main._
 import chat.handlers.ClientHandler._
 import chat.handlers.HubHandler.Broadcast
-
+import chat.Message
+import scala.util.{Failure, Success}
 import scala.collection.mutable
 
 object HubHandler {
@@ -67,7 +68,8 @@ class HubHandler extends Actor with ActorLogging {
       log.info(s"Chat client has been unregistered: $senderAddress")
 
     case HubHandler.Broadcast(senderAddress, senderName, message) =>
-      log.info(s"Broadcasting message from $senderAddress ($senderName)")
+      println("here")
+//      log.info(s"Broadcasting message from $senderAddress ($senderName)")
       activeConnections.foreach {
 
         case (_, connection) =>
@@ -156,10 +158,29 @@ class HubHandler extends Actor with ActorLogging {
       log.warning("Request handler not yet implemented")
 
     case Received(data) =>
-      log.info("Received ByteString from 'Write'") // works!
-      val msg:String = data.decodeString("US-ASCII")
-      println(data.decodeString("US-ASCII"))
-      self ! Broadcast(new InetSocketAddress(hostname, server_port), "whatever", msg)
+
+      //      log.info("Received ByteString from 'Write'") // works!
+      //      val msg:String = data.decodeString("US-ASCII")
+      //      println(data.decodeString("US-ASCII"))
+      //      self ! Broadcast(new InetSocketAddress(hostname, server_port), "whatever", msg)
+      println("I AM IN HUUUUUB!")
+      Message.MessageRequest.deserializeByteString(data) match {
+        case Success(value) =>
+          value.request match {
+            case Message.ClientMessage =>
+              println("type: " + value.request)
+              val msg = value("message").asInstanceOf[String]
+              val name = value("name").asInstanceOf[String]
+              val address = value("connection")
+              self ! Broadcast(new InetSocketAddress(hostname, server_port), name, msg)
+          }
+
+        case Failure(exception) =>
+          println("FAIL :<")
+          throw exception
+
+      }
+
 
     case _ =>
       log.info("Unknown")

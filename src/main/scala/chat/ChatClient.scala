@@ -2,10 +2,14 @@ package chat
 
 import java.net.InetSocketAddress
 
+import scala.util.Try
+import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import chat.handlers.ClientHandler.{ChatMessage, ChatNotification}
+import chat.Message
+import chat.Message._
 import chat.handlers.HubHandler
 
 
@@ -49,7 +53,7 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
             connection ! Register(self)
 
             log.info(s"Connected successfully to $remote as $localAddress")
-            connection ! Write(ByteString("ok im finally connected")) // works!
+//            connection ! Write(ByteString("ok im finally connected")) // works!
             context.become(connectedReceive(connection, localAddress))
 
           case ChatServer.ClientHub(got_hub) =>
@@ -96,12 +100,26 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       log.info(senderName + ": " + message)
     case UserMessage(message) =>
 //      log.info("got input msg: ", message)
-      println(message)
+
       // todo -> broadcast
       println(self)
-      connection ! Write(ByteString(message))
+      val message_request = new Message.MessageRequest(Message.ClientMessage)
+      message_request("name") = name
+//      message_request("connection") = connection
+      message_request("message") = message
+
+      println("SERIALIZING!")
+      message_request.serializeByteString match {
+        case Success(value) =>
+          connection ! Write(value)
+        case Failure(exception) =>
+          println("FAIL :<")
+          throw exception
+      }
+//
+//      connection ! Write(ByteString(message))
+
     case Received(data) =>
-      println("got this from broadcast i guess: ")
       println(data.decodeString("US-ASCII"))
   }
 
