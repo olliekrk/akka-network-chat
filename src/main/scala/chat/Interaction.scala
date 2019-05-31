@@ -8,18 +8,15 @@ class Interaction  extends Actor {
 
   val client: ActorRef = system.actorOf(ChatClient.props(Main.serverAddress, self), "client")
 
-  client ! UserStartConnect()
+  client ! ChatClient.UserStartConnect
 
   override def receive: Receive = {
-    //starting from
     case UserMessage(name) =>
-//      println("Got name!" + name)
       println(self)
       if (name != null) {
-        client ! CurrentUserName(name)
+        client ! ChatClient.CurrentUserName(name)
         context.become({
           case UserMessage(message) =>
-//            println("input message: " + message)
             client ! UserMessage(message)
         })
       } else {

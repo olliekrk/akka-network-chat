@@ -1,31 +1,29 @@
 package chat
 
 import java.net.InetSocketAddress
-
-import scala.util.Try
 import scala.util.{Failure, Success}
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import akka.util.ByteString
 import chat.handlers.ClientHandler.{ChatMessage, ChatNotification}
-import chat.Message
-import chat.Message._
-import chat.handlers.HubHandler
 
 
-case class CurrentUserName(name: String)
 
-
-case class UserStartConnect()
-
-case class UserDisconnect()
 
 object ChatClient {
+
+
+  sealed trait ChatClientCommands
+  case class CurrentUserName(name: String) extends ChatClientCommands
+  case object UserStartConnect extends ChatClientCommands
+  case object UserDisconnect extends ChatClientCommands
+
   def props(remote: InetSocketAddress, listener: ActorRef) =
     Props(new ChatClient(remote, listener))
 }
 
 class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor with ActorLogging {
+
+  import ChatClient._
 
   import akka.io.Tcp._
   import context.system
@@ -37,7 +35,7 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
   var hub: ActorRef = _
 
   override def receive: Receive = {
-    case UserStartConnect() =>
+    case UserStartConnect =>
       IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
       println(self)
       context.become(
