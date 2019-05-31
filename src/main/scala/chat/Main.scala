@@ -5,8 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorSystem, Props}
 
 object Main {
-  val hostname = "localhost"
-  val server_port = 8888
+  var hostname = "localhost"
+  var server_port = 8888
   val serverAddress = new InetSocketAddress(hostname, server_port)
   val serverActorName = "chat_server"
   val actorSystemName = "chat_system"
@@ -18,16 +18,18 @@ object Main {
 
 
     val userInteraction = actorSystem.actorOf(Props[Interaction], "interaction")
-    println("Type in your name: ")
+    println("Enter your name: ")
     while (true) {
       val msg = scala.io.StdIn.readLine()
-      println("read msg: "+ msg)
       userInteraction ! UserMessage(msg)
     }
   }
 
-  def runAsServer(): Unit = {
-
+  def runAsServer(args: Array[String]): Unit = {
+    if (args.length  == 3){
+      hostname = args(1)
+      server_port = args(2).toInt
+    }
     actorSystem.actorOf(ChatServer.props(serverAddress), serverActorName)
   }
 
@@ -35,7 +37,7 @@ object Main {
     if (args.length == 0 || args(0) == "client")
       runAsClient()
     else if (args(0) == "server")
-      runAsServer()
+      runAsServer(args)
     else
       sys.exit(1)
   } catch {

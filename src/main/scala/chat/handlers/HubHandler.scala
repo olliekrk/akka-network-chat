@@ -78,7 +78,7 @@ class HubHandler extends Actor with ActorLogging {
 
           if ((clientNames contains connection) && clientNames(connection).equals(senderName)) {
             println("avoid " + connection + "name: " + senderName)
-          }else{
+          } else {
             connection ! Write(ByteString("sender:" + senderName + " message: " + message))
           }
 
@@ -176,7 +176,7 @@ class HubHandler extends Actor with ActorLogging {
                 println("contains sender()")
               } else {
                 clientNames(sender()) = name
-                println("added: " + clientNames(sender()))
+                //                println("added: " + clientNames(sender()))
               }
               //              val address = value("connection")
               //inetsocket probably useless

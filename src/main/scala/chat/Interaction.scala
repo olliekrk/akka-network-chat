@@ -24,8 +24,8 @@ class Interaction  extends Actor {
         })
       } else {
         println("Wrong name!")
-        // just for now
-        sys.exit(1)
+        print("Enter your name again: ")
+        self ! UserMessage(scala.io.StdIn.readLine())
       }
   }
 }

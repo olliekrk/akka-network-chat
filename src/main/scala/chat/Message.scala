@@ -17,7 +17,6 @@ object Message {
       val serialization = SerializationExtension(system)
       serialization.serialize(obj)
     }
-
     def deserialize[T](bytes: Array[Byte], cls: Class[T])(implicit system: ActorSystem): Try[T] = {
       val serialization = SerializationExtension(system)
       serialization.deserialize(bytes, cls)
@@ -29,11 +28,9 @@ object Message {
 
   class MessageRequest(name: String) extends mutable.HashMap[String, Any] {
     request = name
-
     def request = {
       this("requestName")
     }
-
     def request_=(name: String) {
       this("requestName") = name
     }
@@ -42,10 +39,6 @@ object Message {
         Try(ByteString(b))
       })
     }
-
-//    def deserializeByteString(bytes: ByteString)(implicit system: ActorSystem): Try[MessageRequest] = {
-//      MessageRequest.deserialize(bytes.toArray, classOf[MessageRequest])
-//    }
 
   }
 

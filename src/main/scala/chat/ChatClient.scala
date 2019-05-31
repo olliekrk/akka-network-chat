@@ -53,48 +53,38 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
             connection ! Register(self)
 
             log.info(s"Connected successfully to $remote as $localAddress")
-            context.become(connectedReceive(connection, localAddress))
+            context.become(getUserName(connection, localAddress))
 
-          case ChatServer.ClientHub(got_hub) =>
-            hub = got_hub
           case _ =>
-            log.info("Unknown 1 ")
+            log.info("Unknown")
         }
       )
-
   }
 
-  def connectedReceive(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+  def getUserName(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case CurrentUserName(name) =>
       //log.info("in client: " + name)
       context.become(chat(name, connection, localAddress))
-
     case _ =>
       log.info("Unknown")
   }
 
   def chat(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
-    case ChatMessage(senderName, message) =>
-      log.info(senderName + ": " + message)
-
-      // sends messages from input to all people in (for a while?) default hub
+    // sends messages from input to all clients in default hub
     case UserMessage(message) =>
-      //      log.info("got input msg: ", message)
       println(self)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
-      println("SERIALIZING!")
+
       message_request.serializeByteString match {
         case Success(value) =>
           connection ! Write(value)
         case Failure(exception) =>
-          println("FAIL :<")
+          log.info("FAILED")
           throw exception
       }
 
-
-      // getting message from hub
     case Received(data) =>
       println(data.decodeString("US-ASCII"))
   }
