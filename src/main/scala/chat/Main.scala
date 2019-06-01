@@ -3,44 +3,51 @@ package chat
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorSystem, Props}
+import chat.handlers.ClientHandler
 
 object Main {
-  var hostname = "localhost"
-  var server_port = 8888
-  val serverAddress = new InetSocketAddress(hostname, server_port)
   val serverActorName = "chat_server"
   val actorSystemName = "chat_system"
   val actorSystem = ActorSystem(actorSystemName)
+
   implicit def system: ActorSystem = actorSystem
 
-  def runAsClient(): Unit = {
-//    val actorSystem = ActorSystem(actorSystemName)
+  def runAsClient(serverAddress: InetSocketAddress): Unit = {
+    val clientHandler = actorSystem.actorOf(Props[ClientHandler])
+    val client = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
 
-
-    val userInteraction = actorSystem.actorOf(Props[Interaction], "interaction")
     println("Enter your name: ")
-    while (true) {
-      val msg = scala.io.StdIn.readLine()
-      userInteraction ! UserMessage(msg)
-    }
+    client ! ChatClient.SetUsername(scala.io.StdIn.readLine())
+
+    while (true)
+      client ! ChatClient.UserMessage(scala.io.StdIn.readLine())
+
   }
 
-  def runAsServer(args: Array[String]): Unit = {
-    if (args.length  == 3){
-      hostname = args(1)
-      server_port = args(2).toInt
-    }
+  def runAsServer(serverAddress: InetSocketAddress): Unit = {
     actorSystem.actorOf(ChatServer.props(serverAddress), serverActorName)
   }
 
   def main(args: Array[String]): Unit = try {
-    if (args.length == 0 || args(0) == "client")
-      runAsClient()
-    else if (args(0) == "server")
-      runAsServer(args)
-    else
-      sys.exit(1)
-  } catch {
+
+    var hostname = "localhost"
+    var server_port = 8888
+
+    if (args.length >= 3) {
+      hostname = args(1)
+      server_port = args(2).toInt
+    }
+
+    val serverAddress = new InetSocketAddress(hostname, server_port)
+
+    args match {
+      case Array() => runAsClient(serverAddress)
+      case Array("client", _*) => runAsClient(serverAddress)
+      case Array("server", _*) => runAsServer(serverAddress)
+      case _ => sys.exit(1)
+    }
+  }
+  catch {
     case e: InterruptedException =>
       println("Program interrupted by an exception")
       println(e.getMessage)

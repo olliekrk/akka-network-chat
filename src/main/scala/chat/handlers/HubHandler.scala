@@ -2,16 +2,17 @@ package chat.handlers
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp.{Received, Write}
 import akka.util.ByteString
 import chat.Main._
+import chat.Message
 import chat.handlers.ClientHandler._
 import chat.handlers.HubHandler.Broadcast
-import chat.Message
-import scala.util.{Failure, Success}
+
 import scala.collection.mutable
+import scala.util.{Failure, Success}
 
 object HubHandler {
 
@@ -22,8 +23,6 @@ object HubHandler {
   case class Broadcast(senderAddress: InetSocketAddress, senderName: String, message: String) extends HubRequest
 
   case class Unregister(senderAddress: InetSocketAddress) extends HubRequest
-
-  //todo: other hub requests (i.e. chat rooms related)
 
   case class CreateRoom(senderAddress: InetSocketAddress, roomName: String) extends HubRequest
 
@@ -41,11 +40,15 @@ class HubHandler extends Actor with ActorLogging {
   // but to prevent from receiving your own messages I am gonna hold  actor ref -> name  map
   // and send messages only to other clients
   var clientNames = mutable.Map.empty[ActorRef, String]
+
   val activeConnections: mutable.Map[InetSocketAddress, ActorRef] =
     mutable.Map.empty[InetSocketAddress, ActorRef]
 
   val chatRoomsClients: mutable.Map[String, mutable.Set[InetSocketAddress]] =
     mutable.HashMap.empty[String, mutable.Set[InetSocketAddress]]
+
+  // initialize default room
+  chatRoomsClients += ("default_room" -> mutable.LinkedHashSet[InetSocketAddress]())
 
   val clientsChatRooms: mutable.Map[InetSocketAddress, mutable.Set[String]] =
     mutable.HashMap.empty[InetSocketAddress, mutable.Set[String]]
@@ -71,17 +74,12 @@ class HubHandler extends Actor with ActorLogging {
       log.info(s"Chat client has been unregistered: $senderAddress")
 
     case HubHandler.Broadcast(senderAddress, senderName, message) =>
-      println("BROADCASTING")
-      //      log.info(s"Broadcasting message from $senderAddress ($senderName)")
+      //log.info(s"Broadcasting message from $senderAddress ($senderName)") //TODO: Inet fix
+      log.info(s"Broadcasting message from $senderName") //alternatively
+
       activeConnections.foreach {
-        case (_, connection) =>
-
-          if ((clientNames contains connection) && clientNames(connection).equals(senderName)) {
-            println("avoid " + connection + "name: " + senderName)
-          } else {
-            connection ! Write(ByteString("sender:" + senderName + " message: " + message))
-          }
-
+        case (addr, _) if addr.equals(senderAddress) => //do not send back to the sender?
+        case (_, connection) => connection ! Write(ByteString("sender:" + senderName + " message: " + message))
       }
 
     case HubHandler.CreateRoom(senderAddress, roomName) =>
@@ -165,34 +163,26 @@ class HubHandler extends Actor with ActorLogging {
       log.warning("Request handler not yet implemented")
 
     case Received(data) =>
-      println("sender: " + sender())
       Message.MessageRequest.deserializeByteString(data) match {
         case Success(value) =>
           value.request match {
             case Message.ClientMessage =>
               val msg = value("message").asInstanceOf[String]
               val name = value("name").asInstanceOf[String]
-              if (clientNames contains sender()) {
-                println("contains sender()")
-              } else {
+              if (!(clientNames contains sender())) {
                 clientNames(sender()) = name
-                //                println("added: " + clientNames(sender()))
               }
-              //              val address = value("connection")
-              //inetsocket probably useless
-              self ! Broadcast(new InetSocketAddress(hostname, server_port), name, msg)
+              self ! Broadcast(new InetSocketAddress("somewhere", 0), name, msg) //TODO: same Inet fix
             case _ =>
-              println("sth else")
+              println("Deserialization has succeeded, but message content is unknown")
           }
 
         case Failure(exception) =>
-          println("FAIL :<")
+          println("Deserialization has failed")
           throw exception
-
       }
 
-
     case _ =>
-      log.info("Unknown")
+      log.info("Dude, some weird sh*t happened...")
   }
 }

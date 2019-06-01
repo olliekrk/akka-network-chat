@@ -1,21 +1,25 @@
 package chat
 
 import java.net.InetSocketAddress
-import scala.util.{Failure, Success}
+
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import chat.handlers.ClientHandler.{ChatMessage, ChatNotification}
+import chat.handlers.ClientHandler.ChatNotification
 
-
+import scala.util.{Failure, Success}
 
 
 object ChatClient {
 
+  sealed trait ChatClientCommand
 
-  sealed trait ChatClientCommands
-  case class CurrentUserName(name: String) extends ChatClientCommands
-  case object UserStartConnect extends ChatClientCommands
-  case object UserDisconnect extends ChatClientCommands
+  case class SetUsername(name: String) extends ChatClientCommand
+
+  case class UserMessage(message: String) extends ChatClientCommand
+
+  case object UserConnect extends ChatClientCommand
+
+  case object UserDisconnect extends ChatClientCommand
 
   def props(remote: InetSocketAddress, listener: ActorRef) =
     Props(new ChatClient(remote, listener))
@@ -24,53 +28,45 @@ object ChatClient {
 class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor with ActorLogging {
 
   import ChatClient._
-
   import akka.io.Tcp._
   import context.system
+
   import scala.concurrent.duration._
 
-
   val connectionTimeout: FiniteDuration = 30.seconds
-  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
-  var hub: ActorRef = _
+  IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
 
   override def receive: Receive = {
-    case UserStartConnect =>
-      IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
-      println(self)
-      context.become(
-        {
-          case c@Tcp.CommandFailed(_: Connect) =>
-            listener ! ChatNotification("Tcp.Connect command has failed")
-            println(c)
-            context.stop(self)
 
-          case Tcp.Connected(`remote`, localAddress) =>
-            val connection = sender()
-            // deciding who will receive data from the connection
-            connection ! Register(self)
+    case c@Tcp.CommandFailed(_: Connect) =>
+      listener ! ChatNotification("Tcp.Connect command has failed")
+      println(c)
+      context.stop(self)
 
-            log.info(s"Connected successfully to $remote as $localAddress")
-            context.become(getUserName(connection, localAddress))
+    case Tcp.Connected(`remote`, localAddress) =>
+      val connection = sender()
+      // deciding who will receive data from the connection
+      connection ! Register(self)
 
-          case _ =>
-            log.info("Unknown")
-        }
-      )
-  }
+      log.info(s"Connected successfully to $remote as $localAddress")
+      context.become(signingIn(connection, localAddress))
 
-  def getUserName(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
-    case CurrentUserName(name) =>
-      //log.info("in client: " + name)
-      context.become(chat(name, connection, localAddress))
     case _ =>
-      log.info("Unknown")
+      log.info("Client has received unknown message!")
+
   }
 
-  def chat(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+  def signingIn(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+    case SetUsername(name) =>
+      println(s"Client name has been set to:\t $name")
+      context.become(chatting(name, connection, localAddress))
+    case _ =>
+      log.info("Unknown message received while signing in...")
+  }
+
+  def chatting(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     // sends messages from input to all clients in default hub
     case UserMessage(message) =>
-      println(self)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
@@ -83,7 +79,8 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
           throw exception
       }
 
-    case Received(data) =>
+    case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization
+      //listener ! something from data
       println(data.decodeString("US-ASCII"))
   }
 
