@@ -1,7 +1,8 @@
 package chat.handlers
 
-import akka.actor.{Actor, ActorLogging}
-import ClientHandler._
+import akka.actor.{Actor, ActorLogging, Props}
+import chat.handlers.ClientHandler._
+import scalafx.scene.control.TextArea
 
 object ClientHandler {
 
@@ -11,12 +12,14 @@ object ClientHandler {
 
   case class ChatNotification(message: String) extends ClientRequest
 
+  def props(chatOutputArea: TextArea) = Props(new ClientHandler(chatOutputArea))
+
 }
 
-class ClientHandler extends Actor with ActorLogging {
+class ClientHandler(chatOutput: TextArea) extends Actor with ActorLogging {
   override def receive: Receive = {
-    case ChatMessage(name, message) => println(s"Message from $name:\n\t$message")
-    case ChatNotification(message) => println(s"Notification:\n\t$message")
-    case _ => println("Unknown message to ClientHandler")
+    case ChatMessage(name, message) => chatOutput.appendText(s"Message from $name:\n\t$message")
+    case ChatNotification(message) => chatOutput.appendText(s"Notification:\n\t$message")
+    case _ => chatOutput.appendText("Unknown message to received")
   }
 }

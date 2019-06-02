@@ -1,5 +1,10 @@
 package GUI
 
+import java.net.InetSocketAddress
+
+import akka.actor.{ActorRef, ActorSystem}
+import chat.ChatClient
+import chat.handlers.ClientHandler
 import scalafx.Includes._
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
@@ -13,7 +18,11 @@ import scalafx.scene.text.Text
 
 object ChatClientWindow extends JFXApp {
 
-  val chatSign = ""
+  val actorSystemName = "chat_system"
+
+  val actorSystem = ActorSystem(actorSystemName)
+
+  implicit def system: ActorSystem = actorSystem
 
   val chatOutputArea: TextArea = new TextArea {
     editable = false
@@ -21,12 +30,12 @@ object ChatClientWindow extends JFXApp {
   }
 
   val chatInputField: TextField = new TextField {
-    text = chatSign
+    text.set("")
     onKeyPressed = (a: KeyEvent) => a.code match {
       case KeyCode.Enter =>
         val message = text() + "\n"
-        chatOutputArea.text = chatOutputArea.text() + message
-        text = chatSign
+        text.set("")
+        sendMessage(message)
       case _ =>
     }
   }
@@ -53,11 +62,11 @@ object ChatClientWindow extends JFXApp {
   stage = new PrimaryStage {
     title = "Akka Network Chat"
     scene = new Scene(900, 600) {
-      fill = DeepSkyBlue
-      content = new VBox {
+      root = new VBox {
         spacing = 33
         padding = Insets(30)
         alignment = Pos.Center
+        style = "-fx-background-color: #2F99C2;"
 
         children = Seq(
           new Text {
@@ -78,4 +87,16 @@ object ChatClientWindow extends JFXApp {
 
   val loginDialog = LoginDialog(stage)
   loginDialog.initializeDialog()
+
+  // CLIENT LOGIC, PERHAPS THIS SHOULD BE EXTRACTED ELSEWHERE
+
+  val serverAddress = new InetSocketAddress(loginDialog.hostname, loginDialog.port)
+  val clientHandler: ActorRef = actorSystem.actorOf(ClientHandler.props(chatOutputArea))
+  val client: ActorRef = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
+
+  client ! ChatClient.SetUsername(loginDialog.username)
+
+  def sendMessage(message: String): Unit = {
+    client ! ChatClient.UserMessage(message)
+  }
 }

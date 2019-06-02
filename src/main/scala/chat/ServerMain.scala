@@ -2,27 +2,14 @@ package chat
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorSystem, Props}
-import chat.handlers.ClientHandler
+import akka.actor.ActorSystem
 
-object Main {
+object ServerMain {
   val serverActorName = "chat_server"
   val actorSystemName = "chat_system"
   val actorSystem = ActorSystem(actorSystemName)
 
   implicit def system: ActorSystem = actorSystem
-
-  def runAsClient(serverAddress: InetSocketAddress): Unit = {
-    val clientHandler = actorSystem.actorOf(Props[ClientHandler])
-    val client = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
-
-    println("Enter your name: ")
-    client ! ChatClient.SetUsername(scala.io.StdIn.readLine())
-
-    while (true)
-      client ! ChatClient.UserMessage(scala.io.StdIn.readLine())
-
-  }
 
   def runAsServer(serverAddress: InetSocketAddress): Unit = {
     actorSystem.actorOf(ChatServer.props(serverAddress), serverActorName)
@@ -39,13 +26,8 @@ object Main {
     }
 
     val serverAddress = new InetSocketAddress(hostname, server_port)
+    runAsServer(serverAddress)
 
-    args match {
-      case Array() => runAsClient(serverAddress)
-      case Array("client", _*) => runAsClient(serverAddress)
-      case Array("server", _*) => runAsServer(serverAddress)
-      case _ => sys.exit(1)
-    }
   }
   catch {
     case e: InterruptedException =>

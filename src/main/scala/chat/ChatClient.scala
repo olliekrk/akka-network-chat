@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
+import chat.handlers.ClientHandler
 import chat.handlers.ClientHandler.ChatNotification
 
 import scala.util.{Failure, Success}
@@ -25,7 +26,7 @@ object ChatClient {
     Props(new ChatClient(remote, listener))
 }
 
-class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor with ActorLogging {
+class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor with ActorLogging {
 
   import ChatClient._
   import akka.io.Tcp._
@@ -39,7 +40,7 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
   override def receive: Receive = {
 
     case c@Tcp.CommandFailed(_: Connect) =>
-      listener ! ChatNotification("Tcp.Connect command has failed")
+      listenerGUI ! ChatNotification("Tcp.Connect command has failed")
       println(c)
       context.stop(self)
 
@@ -51,9 +52,8 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       log.info(s"Connected successfully to $remote as $localAddress")
       context.become(signingIn(connection, localAddress))
 
-    case _ =>
-      log.info("Client has received unknown message!")
-
+    case other => // send back till context changes
+      self ! other
   }
 
   def signingIn(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
@@ -80,8 +80,7 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
       }
 
     case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization
-      //listener ! something from data
-      println(data.decodeString("US-ASCII"))
+      listenerGUI ! ClientHandler.ChatMessage("Guest", data.decodeString("US-ASCII"))
   }
 
 

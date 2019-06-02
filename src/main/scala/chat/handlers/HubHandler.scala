@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp.{Received, Write}
 import akka.util.ByteString
-import chat.Main._
+import chat.ServerMain._
 import chat.Message
 import chat.handlers.ClientHandler._
 import chat.handlers.HubHandler.Broadcast

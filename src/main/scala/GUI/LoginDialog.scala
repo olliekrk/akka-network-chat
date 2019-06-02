@@ -19,10 +19,10 @@ object LoginDialog {
   // custom login button
   val loginButtonType = new ButtonType("Sign In", ButtonData.OKDone)
 
-  def apply(stage: Stage): LoginDialog = new LoginDialog(stage, "", "")
+  def apply(stage: Stage): LoginDialog = new LoginDialog(stage, "", "", 0)
 }
 
-class LoginDialog(stage: Stage, var username: String, var hostname: String) {
+class LoginDialog(stage: Stage, var username: String, var hostname: String, var port: Int) {
   val dialog: Dialog[LoginData] = new Dialog[LoginData]() {
     initOwner(stage)
     title = "Sign In"
@@ -55,6 +55,15 @@ class LoginDialog(stage: Stage, var username: String, var hostname: String) {
 
   val loginButton: Node = dialog.dialogPane().lookupButton(LoginDialog.loginButtonType)
 
+  def checkLoginButton(): Unit = {
+    val portText = portField.getText.trim
+    val usernameWRONG = usernameField.getText.trim.isEmpty
+    val hostnameWRONG = hostnameField.getText.trim.isEmpty
+    val portWRONG = portText.isEmpty || !portText.forall(_.isDigit) || portText.length != 4
+
+    loginButton.setDisable(usernameWRONG || hostnameWRONG || portWRONG)
+  }
+
   def initializeDialog(): Unit = {
     loginButton.setDisable(true)
     Platform.runLater(() => usernameField.requestFocus())
@@ -73,18 +82,12 @@ class LoginDialog(stage: Stage, var username: String, var hostname: String) {
     waitForDialog()
   }
 
-  def checkLoginButton(): Unit = {
-    val portText = portField.getText.trim
-    val usernameWRONG = usernameField.getText.trim.isEmpty
-    val hostnameWRONG = hostnameField.getText.trim.isEmpty
-    val portWRONG = portText.isEmpty || !portText.forall(_.isDigit) || portText.length != 4
-
-    loginButton.setDisable(usernameWRONG || hostnameWRONG || portWRONG)
-  }
-
   @tailrec private def waitForDialog(): Unit = {
     dialog.showAndWait() match {
-      case Some(LoginData(u, h, p)) => username = u; hostname = h
+      case Some(LoginData(typedUsername, typedHostname, typedPort)) =>
+        username = typedUsername
+        hostname = typedHostname
+        port = typedPort
       case _ => waitForDialog()
     }
   }

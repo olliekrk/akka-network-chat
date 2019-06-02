@@ -45,7 +45,7 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     case Connected(remote, local) =>
       log.info(s"Receiving connection from remote: $remote to the local address: $local")
       hub ! HubHandler.Register(remote, sender())
-      log.info("sender registered to default room")
+      log.info("New client will be assigned to default room")
     case _ =>
       log.info("Server has received unknown message!")
 
