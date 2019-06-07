@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import chat.handlers.ClientHandler
 import chat.handlers.ClientHandler.ChatNotification
+import chat.handlers.HubHandler.{CreateRoom, JoinRoom}
 
 import scala.util.{Failure, Success}
 
@@ -16,7 +17,9 @@ object ChatClient {
 
   case class SetUsername(name: String) extends ChatClientCommand
 
-  case class UserMessage(message: String) extends ChatClientCommand
+  case class UserMessage(message: String, room: String) extends ChatClientCommand
+
+  case class CreateNewRoom(roomName: String) extends ChatClientCommand
 
   case object UserConnect extends ChatClientCommand
 
@@ -66,11 +69,23 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
 
   def chatting(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     // sends messages from input to all clients in default hub
-    case UserMessage(message) =>
+    case UserMessage(message, room) =>
+      println("IN CC: " + message + room)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
-
+      message_request("room") = room
+      message_request.serializeByteString match {
+        case Success(value) =>
+          println("SENT!")
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+    case CreateNewRoom(roomName) =>
+      val message_request = new Message.MessageRequest(Message.CreateRoom)
+      message_request("room") = roomName
       message_request.serializeByteString match {
         case Success(value) =>
           connection ! Write(value)
@@ -79,9 +94,43 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
           throw exception
       }
 
-    case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization
-      listenerGUI ! ClientHandler.ChatMessage("Guest", data.decodeString("US-ASCII"))
+    case JoinRoom(addr, roomName) =>
+      val message_request = new Message.MessageRequest(Message.JoinRoom)
+      message_request("room") = roomName
+      message_request.serializeByteString match {
+        case Success(value) =>
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+
+    case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization + room
+      Message.MessageRequest.deserializeByteString(data) match {
+        case Success(value) =>
+          value.request match {
+            case Message.OtherClientMessage =>
+              val msg = value("message").asInstanceOf[String]
+              val sender = value("sender").asInstanceOf[String]
+              val roomName = value("room").asInstanceOf[String]
+
+              if (sender == name){
+                listenerGUI ! ClientHandler.ChatMessage("YOU", msg, roomName)
+              }else{
+                listenerGUI ! ClientHandler.ChatMessage(sender, msg, roomName)
+              }
+
+            case _ =>
+              log.info("WEIRD THING ???")
+
+          }
+        case Failure(e) =>
+          println("FAILURE")
+      }
+//
+//      listenerGUI ! ClientHandler.ChatMessage("Guest", data.decodeString("US-ASCII"), "default_room")
   }
 
 
 }
+

@@ -9,7 +9,7 @@ import akka.util.ByteString
 import chat.ServerMain._
 import chat.Message
 import chat.handlers.ClientHandler._
-import chat.handlers.HubHandler.Broadcast
+import chat.handlers.HubHandler.{Broadcast, CreateRoom}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -20,7 +20,7 @@ object HubHandler {
 
   case class Register(remote: InetSocketAddress, connection: ActorRef) extends HubRequest
 
-  case class Broadcast(senderAddress: InetSocketAddress, senderName: String, message: String) extends HubRequest
+  case class Broadcast(senderAddress: InetSocketAddress, senderName: String, message: String, roomName: String) extends HubRequest
 
   case class Unregister(senderAddress: InetSocketAddress) extends HubRequest
 
@@ -63,6 +63,7 @@ class HubHandler extends Actor with ActorLogging {
 
       activeConnections += (remoteAddress -> connection)
       clientsChatRooms += (remoteAddress -> new mutable.LinkedHashSet[String]())
+      chatRoomsClients("default_room").add(remoteAddress)
       log.info(s"New chat client has been registered: $remoteAddress")
 
     case HubHandler.Unregister(senderAddress) =>
@@ -73,14 +74,29 @@ class HubHandler extends Actor with ActorLogging {
       }
       log.info(s"Chat client has been unregistered: $senderAddress")
 
-    case HubHandler.Broadcast(senderAddress, senderName, message) =>
+    case HubHandler.Broadcast(senderAddress, senderName, message, roomName) =>
       //log.info(s"Broadcasting message from $senderAddress ($senderName)") //TODO: Inet fix
       log.info(s"Broadcasting message from $senderName") //alternatively
-
-      activeConnections.foreach {
-        case (addr, _) if addr.equals(senderAddress) => //do not send back to the sender?
-        case (_, connection) => connection ! Write(ByteString("sender:" + senderName + " message: " + message))
+    val users = chatRoomsClients(roomName).toList
+      for (u <- users) {
+        val message_request = new Message.MessageRequest(Message.OtherClientMessage)
+        message_request("room") = roomName
+        message_request("sender") = senderName
+        message_request("message") = message
+        message_request.serializeByteString match {
+          case Success(value) =>
+            activeConnections(u) ! Write(value)
+          case Failure(exception) =>
+            log.info("FAILED")
+            throw exception
+        }
+//        activeConnections(u) ! Write(ByteString("sender:" + senderName + " message: " + message))
       }
+    //      activeConnections.foreach {
+    //        case (addr, _) if addr.equals(senderAddress) => //do not send back to the sender?
+    //        case (_, connection) => connection ! Write(ByteString("sender:" + senderName + " message: " + message))
+    //      }
+
 
     case HubHandler.CreateRoom(senderAddress, roomName) =>
       //if such room already exists
@@ -90,9 +106,9 @@ class HubHandler extends Actor with ActorLogging {
 
       //otherwise create new room with that name and add sender as a member of it
       else {
+        println("ROOM " + roomName + " added")
         clientsChatRooms(senderAddress) += roomName
         chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
-
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
         log.info(s"Chat room with name '$roomName' has been created")
       }
@@ -130,8 +146,8 @@ class HubHandler extends Actor with ActorLogging {
         chatRoomsClients(roomName).foreach { address: InetSocketAddress =>
           val connection = activeConnections(address)
           address match {
-            case `senderAddress` => connection ! ChatMessage("YOU", message)
-            case _ => connection ! ChatMessage(senderName, message)
+            case `senderAddress` => connection ! ChatMessage("YOU", message, roomName)
+            case _ => connection ! ChatMessage(senderName, message, roomName)
           }
         }
 
@@ -169,10 +185,21 @@ class HubHandler extends Actor with ActorLogging {
             case Message.ClientMessage =>
               val msg = value("message").asInstanceOf[String]
               val name = value("name").asInstanceOf[String]
+              val roomName = value("room").asInstanceOf[String]
               if (!(clientNames contains sender())) {
                 clientNames(sender()) = name
               }
-              self ! Broadcast(new InetSocketAddress("somewhere", 0), name, msg) //TODO: same Inet fix
+              println("BROADCASTING IN : " + roomName)
+              self ! Broadcast(new InetSocketAddress("somewhere", 0), name, msg, roomName) //TODO: same Inet fix
+            case Message.CreateRoom =>
+              val roomName = value("room").asInstanceOf[String]
+
+              for ((key, value) <- activeConnections){
+                if (sender() == value){
+                  self ! CreateRoom(key, roomName)
+                }
+              }
+
             case _ =>
               println("Deserialization has succeeded, but message content is unknown")
           }

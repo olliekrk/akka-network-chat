@@ -11,6 +11,10 @@ object Message {
 
   val ClientMessage = "ClientMessage"
   val MessageFromOther = "MessageFromOther"
+  val LeaveRoom = "LeaveRoom"
+  val JoinRoom = "JoinRoom"
+  val CreateRoom = "CreateRoom"
+  val OtherClientMessage = "OtherClientMessage"
 
   object MessageRequest {
     def serialize(obj: AnyRef)(implicit system: ActorSystem): Try[Array[Byte]] = {
