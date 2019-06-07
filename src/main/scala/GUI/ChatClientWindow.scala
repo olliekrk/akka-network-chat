@@ -1,19 +1,19 @@
 package GUI
 
 import java.net.InetSocketAddress
-import java.time.LocalDateTime
 import java.util.Calendar
 
 import akka.actor.{ActorRef, ActorSystem}
 import chat.ChatClient
-import chat.handlers.ClientHandler
+import chat.handlers.{ClientGUIHandler, HubHandler}
 import scalafx.Includes._
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.event.ActionEvent
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Scene
-import scalafx.scene.control.{Button, Tab, TabPane, TextArea, TextField, TextInputDialog}
+import scalafx.scene.control.Alert.AlertType
+import scalafx.scene.control._
 import scalafx.scene.input.{KeyCode, KeyEvent}
 import scalafx.scene.layout.{BorderPane, HBox, VBox}
 import scalafx.scene.paint.Color._
@@ -48,7 +48,7 @@ object ChatClientWindow extends JFXApp {
   val activeRoomsOutput: mutable.Map[String, TextArea] = mutable.Map.empty[String, TextArea]
   val activeRoomsInput: mutable.Map[String, TextField] = mutable.Map.empty[String, TextField]
   val serverAddress = new InetSocketAddress(loginDialog.hostname, loginDialog.port)
-  val clientHandler: ActorRef = actorSystem.actorOf(ClientHandler.props(activeRoomsOutput))
+  val clientHandler: ActorRef = actorSystem.actorOf(ClientGUIHandler.props(activeRoomsOutput))
   val client: ActorRef = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
 
   val chatOutputArea: TextArea = new TextArea {
@@ -63,7 +63,7 @@ object ChatClientWindow extends JFXApp {
       case KeyCode.Enter =>
         val message = text() + "\n"
         text.set("")
-        sendMessage(message, "default_room")
+        sendMessage(message, HubHandler.defaultRoomName)
       case _ =>
     }
   }
@@ -75,17 +75,18 @@ object ChatClientWindow extends JFXApp {
   }
 
   val defaultRoomTab: Tab = new Tab {
-    text = "default_room"
+    text = HubHandler.defaultRoomName
     content = mainChat
     onClosed = handle(stopApp())
+    closable = false
   }
 
   val tabPane: TabPane = new TabPane {
     tabs = List(defaultRoomTab) // to distinguish rooms of current active client
   }
 
-  activeRoomsOutput += ("default_room" -> chatOutputArea)
-  activeRoomsInput += ("default_room" -> chatInputField)
+  activeRoomsOutput += (HubHandler.defaultRoomName -> chatOutputArea)
+  activeRoomsInput += (HubHandler.defaultRoomName -> chatInputField)
 
   val createRoomButton: Button = new Button {
     text = "Create Room"
@@ -237,5 +238,14 @@ object ChatClientWindow extends JFXApp {
         println(name)
       case None => println("Dialog was canceled.")
     }
+  }
+
+  def showWarningAlert(message: String): Unit = {
+    new Alert(AlertType.Warning) {
+      initOwner(stage)
+      title = "Warning"
+      headerText = "There was a problem with your request!"
+      contentText = "message"
+    }.showAndWait()
   }
 }

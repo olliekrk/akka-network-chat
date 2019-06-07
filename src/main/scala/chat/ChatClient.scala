@@ -4,9 +4,8 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import chat.handlers.ClientHandler
-import chat.handlers.ClientHandler.ChatNotification
-import chat.handlers.HubHandler.{CreateRoom, JoinRoom}
+import chat.handlers.ClientGUIHandler
+import chat.handlers.ClientGUIHandler.ChatNotification
 
 import scala.util.{Failure, Success}
 
@@ -121,7 +120,7 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
           throw exception
       }
 
-    case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization + room
+    case Received(data) =>
       Message.MessageRequest.deserializeByteString(data) match {
         case Success(value) =>
           value.request match {
@@ -130,21 +129,22 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
               val sender = value("sender").asInstanceOf[String]
               val roomName = value("room").asInstanceOf[String]
 
-              if (sender == name){
-                listenerGUI ! ClientHandler.ChatMessage("YOU", msg, roomName)
-              }else{
-                listenerGUI ! ClientHandler.ChatMessage(sender, msg, roomName)
+              if (sender == name) {
+                listenerGUI ! ClientGUIHandler.ChatMessage("YOU", msg, roomName)
+              } else {
+                listenerGUI ! ClientGUIHandler.ChatMessage(sender, msg, roomName)
               }
-
+            case Message.Notification =>
+              val message = value("message").asInstanceOf[String]
+              listenerGUI ! ClientGUIHandler.ChatNotification(message)
             case _ =>
               log.info("WEIRD THING ???")
 
           }
-        case Failure(e) =>
-          println("FAILURE")
+        case Failure(_) =>
+          log.info("Deserialization has failed")
       }
-//
-//      listenerGUI ! ClientHandler.ChatMessage("Guest", data.decodeString("US-ASCII"), "default_room")
+
   }
 
 

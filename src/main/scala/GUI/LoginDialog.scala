@@ -16,7 +16,6 @@ object LoginDialog {
 
   case class LoginData(username: String, hostname: String, port: Int)
 
-  // custom login button
   val loginButtonType = new ButtonType("Sign In", ButtonData.OKDone)
 
   def apply(stage: Stage): LoginDialog = new LoginDialog(stage, "", "", 0)
