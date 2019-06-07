@@ -1,80 +1,95 @@
 package chat
 
 import java.net.InetSocketAddress
-import scala.util.{Failure, Success}
+
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import chat.handlers.ClientHandler.{ChatMessage, ChatNotification}
+import chat.handlers.ClientHandler
+import chat.handlers.ClientHandler.ChatNotification
+import chat.handlers.HubHandler.{CreateRoom, JoinRoom}
 
-
+import scala.util.{Failure, Success}
 
 
 object ChatClient {
 
+  sealed trait ChatClientCommand
 
-  sealed trait ChatClientCommands
-  case class CurrentUserName(name: String) extends ChatClientCommands
-  case object UserStartConnect extends ChatClientCommands
-  case object UserDisconnect extends ChatClientCommands
+  case class SetUsername(name: String) extends ChatClientCommand
+
+  case class UserMessage(message: String, room: String) extends ChatClientCommand
+
+  case class CreateNewRoom(roomName: String) extends ChatClientCommand
+
+  case class JoinNewRoom(roomName: String) extends ChatClientCommand
+
+  case class LeaveRoom(roomName: String) extends ChatClientCommand
+
+  case object UserConnect extends ChatClientCommand
+
+  case object UserDisconnect extends ChatClientCommand
 
   def props(remote: InetSocketAddress, listener: ActorRef) =
     Props(new ChatClient(remote, listener))
 }
 
-class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor with ActorLogging {
+class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor with ActorLogging {
 
   import ChatClient._
-
   import akka.io.Tcp._
   import context.system
+
   import scala.concurrent.duration._
 
-
   val connectionTimeout: FiniteDuration = 30.seconds
-  IO(Tcp) ! Connect(remote, timeout = Option(connectionTimeout))
-  var hub: ActorRef = _
+  IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
 
   override def receive: Receive = {
-    case UserStartConnect =>
-      IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
-      println(self)
-      context.become(
-        {
-          case c@Tcp.CommandFailed(_: Connect) =>
-            listener ! ChatNotification("Tcp.Connect command has failed")
-            println(c)
-            context.stop(self)
 
-          case Tcp.Connected(`remote`, localAddress) =>
-            val connection = sender()
-            // deciding who will receive data from the connection
-            connection ! Register(self)
+    case c@Tcp.CommandFailed(_: Connect) =>
+      listenerGUI ! ChatNotification("Tcp.Connect command has failed")
+      println(c)
+      context.stop(self)
 
-            log.info(s"Connected successfully to $remote as $localAddress")
-            context.become(getUserName(connection, localAddress))
+    case Tcp.Connected(`remote`, localAddress) =>
+      val connection = sender()
+      // deciding who will receive data from the connection
+      connection ! Register(self)
 
-          case _ =>
-            log.info("Unknown")
-        }
-      )
+      log.info(s"Connected successfully to $remote as $localAddress")
+      context.become(signingIn(connection, localAddress))
+
+    case other => // send back till context changes
+      self ! other
   }
 
-  def getUserName(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
-    case CurrentUserName(name) =>
-      //log.info("in client: " + name)
-      context.become(chat(name, connection, localAddress))
+  def signingIn(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+    case SetUsername(name) =>
+      println(s"Client name has been set to:\t $name")
+      context.become(chatting(name, connection, localAddress))
     case _ =>
-      log.info("Unknown")
+      log.info("Unknown message received while signing in...")
   }
 
-  def chat(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
+  def chatting(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     // sends messages from input to all clients in default hub
-    case UserMessage(message) =>
-      println(self)
+    case UserMessage(message, room) =>
+      println("IN CC: " + message + room)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
-
+      message_request("room") = room
+      message_request.serializeByteString match {
+        case Success(value) =>
+          println("SENT!")
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+    case CreateNewRoom(roomName) =>
+      val message_request = new Message.MessageRequest(Message.CreateRoom)
+      message_request("room") = roomName
       message_request.serializeByteString match {
         case Success(value) =>
           connection ! Write(value)
@@ -83,9 +98,55 @@ class ChatClient(remote: InetSocketAddress, listener: ActorRef) extends Actor wi
           throw exception
       }
 
-    case Received(data) =>
-      println(data.decodeString("US-ASCII"))
+    case JoinNewRoom(roomName) =>
+      val message_request = new Message.MessageRequest(Message.JoinRoom)
+      message_request("room") = roomName
+      message_request.serializeByteString match {
+        case Success(value) =>
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+
+    case LeaveRoom(roomName) =>
+      val message_request = new Message.MessageRequest(Message.LeaveRoom)
+      message_request("room") = roomName
+      message_request("name") = name
+      message_request.serializeByteString match {
+        case Success(value) =>
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+
+    case Received(data) => //TODO: make use of case classes in ClientHandler + deserialization + room
+      Message.MessageRequest.deserializeByteString(data) match {
+        case Success(value) =>
+          value.request match {
+            case Message.OtherClientMessage =>
+              val msg = value("message").asInstanceOf[String]
+              val sender = value("sender").asInstanceOf[String]
+              val roomName = value("room").asInstanceOf[String]
+
+              if (sender == name){
+                listenerGUI ! ClientHandler.ChatMessage("YOU", msg, roomName)
+              }else{
+                listenerGUI ! ClientHandler.ChatMessage(sender, msg, roomName)
+              }
+
+            case _ =>
+              log.info("WEIRD THING ???")
+
+          }
+        case Failure(e) =>
+          println("FAILURE")
+      }
+//
+//      listenerGUI ! ClientHandler.ChatMessage("Guest", data.decodeString("US-ASCII"), "default_room")
   }
 
 
 }
+

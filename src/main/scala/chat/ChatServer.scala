@@ -5,21 +5,14 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import chat.ChatServer.ClientHub
 import chat.handlers.HubHandler
 
 object ChatServer {
-
-
-  case class ClientHub(hub: ActorRef)
 
   //provide IP address and port number
   def props(address: InetSocketAddress): Props =
     Props(new ChatServer(address))
 
-  //by default chose random port on localhost
-  def props(): Props =
-    Props(new ChatServer(new InetSocketAddress("localhost", 0)))
 }
 
 class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
@@ -27,7 +20,6 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
   import context.system
 
   val hub: ActorRef = context.actorOf(Props[HubHandler])
-
 
   IO(Tcp) ! Bind(self, address)
 
@@ -44,6 +36,7 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     case CommandFailed(_: Bind) =>
       log.warning("Received fail message. Shutting down the chat server.")
       context stop self
+
     /*
       In order to activate the new connection a Register message
       must be sent to the connection actor, informing that one
@@ -51,21 +44,10 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
     */
     case Connected(remote, local) =>
       log.info(s"Receiving connection from remote: $remote to the local address: $local")
-      hub ! HubHandler.CreateRoom(remote, "default_room")
-      log.info("Created new default room")
       hub ! HubHandler.Register(remote, sender())
-      log.info("sender registered to default room")
-
-      context.become({
-        case Connected(remote, local) =>
-          log.info(s"Receiving connection from remote: $remote to the local address: $local")
-          hub ! HubHandler.Register(remote, sender())
-          log.info("sender registered to default room")
-        case _ =>
-          log.info("sth here ? :<")
-      })
-
+      log.info("New client will be assigned to default room")
     case _ =>
-      log.info("sth here ? :<")
+      log.info("Server has received unknown message!")
+
   }
 }
