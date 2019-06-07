@@ -21,6 +21,8 @@ object ChatClient {
 
   case class CreateNewRoom(roomName: String) extends ChatClientCommand
 
+  case class JoinNewRoom(roomName: String) extends ChatClientCommand
+
   case object UserConnect extends ChatClientCommand
 
   case object UserDisconnect extends ChatClientCommand
@@ -94,7 +96,7 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
           throw exception
       }
 
-    case JoinRoom(addr, roomName) =>
+    case JoinNewRoom(roomName) =>
       val message_request = new Message.MessageRequest(Message.JoinRoom)
       message_request("room") = roomName
       message_request.serializeByteString match {

@@ -9,7 +9,7 @@ import akka.util.ByteString
 import chat.ServerMain._
 import chat.Message
 import chat.handlers.ClientHandler._
-import chat.handlers.HubHandler.{Broadcast, CreateRoom}
+import chat.handlers.HubHandler.{Broadcast, CreateRoom, JoinRoom}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -78,7 +78,9 @@ class HubHandler extends Actor with ActorLogging {
       //log.info(s"Broadcasting message from $senderAddress ($senderName)") //TODO: Inet fix
       log.info(s"Broadcasting message from $senderName") //alternatively
     val users = chatRoomsClients(roomName).toList
+      println("users: ")
       for (u <- users) {
+        println("user" + u)
         val message_request = new Message.MessageRequest(Message.OtherClientMessage)
         message_request("room") = roomName
         message_request("sender") = senderName
@@ -90,7 +92,7 @@ class HubHandler extends Actor with ActorLogging {
             log.info("FAILED")
             throw exception
         }
-//        activeConnections(u) ! Write(ByteString("sender:" + senderName + " message: " + message))
+        //        activeConnections(u) ! Write(ByteString("sender:" + senderName + " message: " + message))
       }
     //      activeConnections.foreach {
     //        case (addr, _) if addr.equals(senderAddress) => //do not send back to the sender?
@@ -115,19 +117,22 @@ class HubHandler extends Actor with ActorLogging {
 
     case HubHandler.JoinRoom(senderAddress, roomName) =>
       //if such room does not exist
+
+      println("JOOOOOINNNNN")
       if (!chatRoomsClients.keySet.contains(roomName)) {
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
       }
 
       //if the sender is already a member of such room
-      else if (clientsChatRooms(senderAddress) contains roomName) {
-        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
-      }
+//      else if (clientsChatRooms(senderAddress) contains roomName) {
+//        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
+//      }
 
       //otherwise let sender join that room
       else {
         clientsChatRooms(senderAddress) += roomName
-
+        println("adding : " + senderAddress + " to: " + roomName)
+        chatRoomsClients(roomName).add(senderAddress)
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
         log.info(s"Client $senderAddress has joined the room '$roomName'")
       }
@@ -194,9 +199,17 @@ class HubHandler extends Actor with ActorLogging {
             case Message.CreateRoom =>
               val roomName = value("room").asInstanceOf[String]
 
-              for ((key, value) <- activeConnections){
-                if (sender() == value){
+              for ((key, value) <- activeConnections) {
+                if (sender() == value) {
                   self ! CreateRoom(key, roomName)
+                }
+              }
+            case Message.JoinRoom =>
+              println("JOINING")
+              val roomName = value("room").asInstanceOf[String]
+              for ((key, value) <- activeConnections) {
+                if (sender() == value) {
+                  self ! JoinRoom(key, roomName)
                 }
               }
 

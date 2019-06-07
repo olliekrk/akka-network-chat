@@ -90,7 +90,7 @@ object ChatClientWindow extends JFXApp {
 
     result match {
       case Some(name) =>
-        /* todo-> send request and wait for result */
+        /* todo->  wait for result whether room can be added*/
         client ! ChatClient.CreateNewRoom(name)
         val newTab = new Tab
         newTab.text = name
@@ -126,6 +126,54 @@ object ChatClientWindow extends JFXApp {
   val joinRoomButton: Button = new Button {
     text = "Join Room"
   }
+  joinRoomButton.onAction = (e: ActionEvent ) => {
+
+    val dialog = new TextInputDialog() {
+      initOwner(stage)
+      title = "Join room"
+      headerText = "You can join existing room."
+      contentText = "Please enter its name:"
+    }
+
+    val result = dialog.showAndWait()
+
+    result match {
+      case Some(name) =>
+      // todo -> wait for response,
+        client ! ChatClient.JoinNewRoom(name)
+        val newTab = new Tab
+        newTab.text = name
+
+        val newTextArea =  new TextArea {
+          editable = false
+          focusTraversable = false
+        }
+        val newTextField = new TextField {
+          text.set("")
+          onKeyPressed = (a: KeyEvent) => a.code match {
+            case KeyCode.Enter =>
+              val message = text() + "\n"
+              text.set("")
+              sendMessage(message, name)
+            case _ =>
+          }
+        }
+        val tabChat: VBox = new VBox{
+          padding = Insets(5)
+          alignment = Pos.TopCenter
+          children = Seq(newTextArea, newTextField)
+        }
+        newTab.content = tabChat
+        activeRoomsOutput += (name -> newTextArea)
+        activeRoomsInput += (name -> newTextField)
+        tabPane.tabs += newTab
+        println(name)
+      case None       => println("Dialog was canceled.")
+    }
+  }
+
+
+
   val leaveRoomButton: Button = new Button {
     text = "Leave Room"
   }
@@ -155,7 +203,7 @@ object ChatClientWindow extends JFXApp {
 
         children = Seq(
           new Text {
-            text = "Hello Chat!"
+            text = "Hello Chat!" + loginDialog.username
             style = "-fx-font: bold 32pt sans-serif"
             fill = White
 
@@ -166,11 +214,6 @@ object ChatClientWindow extends JFXApp {
     }
 
   }
-
-
-
-  // CLIENT LOGIC, PERHAPS THIS SHOULD BE EXTRACTED ELSEWHERE
-
 
   client ! ChatClient.SetUsername(loginDialog.username)
 
