@@ -6,6 +6,7 @@ import java.util.Calendar
 import GUI.ChatClientWindow
 import akka.actor.{Actor, ActorLogging, Props}
 import chat.handlers.ClientGUIHandler._
+import scalafx.application.Platform
 import scalafx.scene.control.TextArea
 
 import scala.collection.mutable
@@ -30,8 +31,7 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
       chatOutputAreas(room).appendText(s"[$dateTime] Message from $name:\n\t$message")
     case ChatNotification(message) =>
       print(message)
-      // TODO: to nie działa wlasnie
-//      ChatClientWindow.showWarningAlert(message)
+      Platform.runLater(() => ChatClientWindow.warningDialog(message))
     case _ =>
     //      chatOutputAreas(room).appendText("Unknown message received")
   }

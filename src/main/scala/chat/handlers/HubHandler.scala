@@ -101,8 +101,8 @@ class HubHandler extends Actor with ActorLogging {
       //if such room already exists
       if (chatRoomsClients.keySet contains roomName) {
 
-        // TODO: TEST NOTIFICATION
-        print("Attempt to create another room with the same name")
+        // TODO: NOTIFICATION EXAMPLE
+        log.warning("Attempt to create another room with the same name")
 
         val requestMap = Map("message" -> s"Chat room with name '$roomName' already exists")
         val request = Message.prepareRequest(Message.Notification, requestMap)
