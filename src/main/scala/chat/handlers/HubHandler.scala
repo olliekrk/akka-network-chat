@@ -1,16 +1,13 @@
 package chat.handlers
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp.{Received, Write}
-import akka.util.ByteString
 import chat.ServerMain._
 import chat.Message
 import chat.handlers.ClientHandler._
 import chat.handlers.HubHandler.{Broadcast, CreateRoom, JoinRoom, LeaveRoom}
-
 import scala.collection.mutable
 import scala.util.{Failure, Success}
 

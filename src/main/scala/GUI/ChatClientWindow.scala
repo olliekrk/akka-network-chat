@@ -5,7 +5,6 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorSystem}
 import chat.ChatClient
 import chat.handlers.ClientHandler
-import javafx.event.EventHandler
 import scalafx.Includes._
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
@@ -24,7 +23,6 @@ object ChatClientWindow extends JFXApp {
 
 
   val actorSystemName = "chat_system"
-
   val actorSystem = ActorSystem(actorSystemName)
 
   implicit def system: ActorSystem = actorSystem
@@ -181,12 +179,6 @@ object ChatClientWindow extends JFXApp {
     }
   }
 
-
-  //  val leaveRoomButton: Button = new Button {
-  //    text = "Leave Room"
-  //  }
-
-
   val buttonsBar: HBox = new HBox {
     spacing = 25
     padding = Insets(15)
@@ -216,7 +208,7 @@ object ChatClientWindow extends JFXApp {
             fill = White
 
           }, borderPane,
-          new Text{
+          new Text {
             text = "logged as: " + loginDialog.username
             style = "-fx-font: italic 16pt sans-serif"
             fill = White
