@@ -240,12 +240,13 @@ object ChatClientWindow extends JFXApp {
     }
   }
 
-  def showWarningAlert(message: String): Unit = {
+  def warningDialog(message: String): Unit = {
     new Alert(AlertType.Warning) {
       initOwner(stage)
       title = "Warning"
-      headerText = "There was a problem with your request!"
-      contentText = "message"
+      headerText = "Your request is invalid"
+      contentText = message
     }.showAndWait()
   }
+
 }
