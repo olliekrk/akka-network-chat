@@ -9,7 +9,7 @@ import akka.util.ByteString
 import chat.ServerMain._
 import chat.Message
 import chat.handlers.ClientHandler._
-import chat.handlers.HubHandler.{Broadcast, CreateRoom, JoinRoom}
+import chat.handlers.HubHandler.{Broadcast, CreateRoom, JoinRoom, LeaveRoom}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -124,9 +124,9 @@ class HubHandler extends Actor with ActorLogging {
       }
 
       //if the sender is already a member of such room
-//      else if (clientsChatRooms(senderAddress) contains roomName) {
-//        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
-//      }
+      //      else if (clientsChatRooms(senderAddress) contains roomName) {
+      //        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
+      //      }
 
       //otherwise let sender join that room
       else {
@@ -210,6 +210,14 @@ class HubHandler extends Actor with ActorLogging {
               for ((key, value) <- activeConnections) {
                 if (sender() == value) {
                   self ! JoinRoom(key, roomName)
+                }
+              }
+            case Message.LeaveRoom =>
+              val name = value("name").asInstanceOf[String]
+              val roomName = value("room").asInstanceOf[String]
+              for ((key, value) <- activeConnections) {
+                if (sender() == value) {
+                  self ! LeaveRoom(key, name, roomName)
                 }
               }
 

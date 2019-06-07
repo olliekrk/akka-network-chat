@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorSystem}
 import chat.ChatClient
 import chat.handlers.ClientHandler
+import javafx.event.EventHandler
 import scalafx.Includes._
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
@@ -27,6 +28,7 @@ object ChatClientWindow extends JFXApp {
   val actorSystem = ActorSystem(actorSystemName)
 
   implicit def system: ActorSystem = actorSystem
+
   val loginDialog = LoginDialog(stage)
   loginDialog.initializeDialog()
 
@@ -57,29 +59,27 @@ object ChatClientWindow extends JFXApp {
 
   val defaultTab = new Tab
   defaultTab.text = "default_room"
+  defaultTab.onClosed = handle(stopApp())
   tabPane.tabs = List(defaultTab)
   // to distinguish rooms of current active client
 
 
   activeRoomsOutput += ("default_room" -> chatOutputArea)
   activeRoomsInput += ("default_room" -> chatInputField)
-  val mainChat: VBox = new VBox{
+  val mainChat: VBox = new VBox {
     padding = Insets(5)
     alignment = Pos.TopCenter
     children = Seq(chatOutputArea, chatInputField)
   }
   defaultTab.content = mainChat
 
-  val privateChatButton: Button = new Button {
-    text = "Private Chat"
-  }
   val createRoomButton: Button = new Button {
     text = "Create Room"
   }
-  createRoomButton.onAction = (e: ActionEvent ) => {
+  createRoomButton.onAction = (e: ActionEvent) => {
     val rnd = new scala.util.Random
     val randomValue = rnd.nextInt(15)
-    val dialog = new TextInputDialog(defaultValue = "new_room" + randomValue ) {
+    val dialog = new TextInputDialog(defaultValue = "new_room" + randomValue) {
       initOwner(stage)
       title = "Create room"
       headerText = "You can create your own room."
@@ -95,7 +95,7 @@ object ChatClientWindow extends JFXApp {
         val newTab = new Tab
         newTab.text = name
 
-        val newTextArea =  new TextArea {
+        val newTextArea = new TextArea {
           editable = false
           focusTraversable = false
         }
@@ -109,7 +109,7 @@ object ChatClientWindow extends JFXApp {
             case _ =>
           }
         }
-        val tabChat: VBox = new VBox{
+        val tabChat: VBox = new VBox {
           padding = Insets(5)
           alignment = Pos.TopCenter
           children = Seq(newTextArea, newTextField)
@@ -119,14 +119,15 @@ object ChatClientWindow extends JFXApp {
         activeRoomsInput += (name -> newTextField)
         tabPane.tabs += newTab
         println(name)
-      case None       => println("Dialog was canceled.")
+      case None => println("Dialog was canceled.")
     }
   }
 
   val joinRoomButton: Button = new Button {
     text = "Join Room"
   }
-  joinRoomButton.onAction = (e: ActionEvent ) => {
+
+  joinRoomButton.onAction = (e: ActionEvent) => {
 
     val dialog = new TextInputDialog() {
       initOwner(stage)
@@ -139,12 +140,14 @@ object ChatClientWindow extends JFXApp {
 
     result match {
       case Some(name) =>
-      // todo -> wait for response,
+        // todo -> wait for response,
         client ! ChatClient.JoinNewRoom(name)
         val newTab = new Tab
         newTab.text = name
-
-        val newTextArea =  new TextArea {
+        newTab.onClosed = handle(
+          client ! ChatClient.LeaveRoom(name)
+        )
+        val newTextArea = new TextArea {
           editable = false
           focusTraversable = false
         }
@@ -158,7 +161,7 @@ object ChatClientWindow extends JFXApp {
             case _ =>
           }
         }
-        val tabChat: VBox = new VBox{
+        val tabChat: VBox = new VBox {
           padding = Insets(5)
           alignment = Pos.TopCenter
           children = Seq(newTextArea, newTextField)
@@ -168,27 +171,25 @@ object ChatClientWindow extends JFXApp {
         activeRoomsInput += (name -> newTextField)
         tabPane.tabs += newTab
         println(name)
-      case None       => println("Dialog was canceled.")
+      case None => println("Dialog was canceled.")
     }
   }
 
 
+  //  val leaveRoomButton: Button = new Button {
+  //    text = "Leave Room"
+  //  }
 
-  val leaveRoomButton: Button = new Button {
-    text = "Leave Room"
-  }
+
   val buttonsBar: HBox = new HBox {
-    spacing = 20
-    padding = Insets(10)
+    spacing = 25
+    padding = Insets(15)
     alignment = Pos.Center
-    children = Seq(privateChatButton, createRoomButton, joinRoomButton, leaveRoomButton
-    )
+    children = Seq(createRoomButton, joinRoomButton)
   }
 
   val borderPane: BorderPane = new BorderPane {
     top = buttonsBar
-//    center = chatOutputArea
-//    bottom = chatInputField
     center = tabPane
   }
 
@@ -218,7 +219,7 @@ object ChatClientWindow extends JFXApp {
   client ! ChatClient.SetUsername(loginDialog.username)
 
   def sendMessage(message: String, room: String): Unit = {
-    println("Sending: "+ message + " to room: " + room )
+    println("Sending: " + message + " to room: " + room)
     client ! ChatClient.UserMessage(message, room)
   }
 

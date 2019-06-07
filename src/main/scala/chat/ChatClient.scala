@@ -23,6 +23,8 @@ object ChatClient {
 
   case class JoinNewRoom(roomName: String) extends ChatClientCommand
 
+  case class LeaveRoom(roomName: String) extends ChatClientCommand
+
   case object UserConnect extends ChatClientCommand
 
   case object UserDisconnect extends ChatClientCommand
@@ -99,6 +101,18 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
     case JoinNewRoom(roomName) =>
       val message_request = new Message.MessageRequest(Message.JoinRoom)
       message_request("room") = roomName
+      message_request.serializeByteString match {
+        case Success(value) =>
+          connection ! Write(value)
+        case Failure(exception) =>
+          log.info("FAILED")
+          throw exception
+      }
+
+    case LeaveRoom(roomName) =>
+      val message_request = new Message.MessageRequest(Message.LeaveRoom)
+      message_request("room") = roomName
+      message_request("name") = name
       message_request.serializeByteString match {
         case Success(value) =>
           connection ! Write(value)
