@@ -4,11 +4,10 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
-import akka.io.Tcp.{Received, Write}
-import akka.util.ByteString
-import chat.ServerMain._
+import akka.io.Tcp.{PeerClosed, Received, Write}
 import chat.Message
-import chat.handlers.ClientHandler._
+import chat.Message.MessageRequest
+import chat.handlers.ClientGUIHandler._
 import chat.handlers.HubHandler.{Broadcast, CreateRoom, JoinRoom, LeaveRoom}
 
 import scala.collection.mutable
@@ -32,9 +31,13 @@ object HubHandler {
 
   case class LeaveRoom(senderAddress: InetSocketAddress, senderName: String, roomName: String) extends HubRequest
 
+  val defaultRoomName: String = "Public"
+
 }
 
 class HubHandler extends Actor with ActorLogging {
+
+  import context.system
 
   // after registration we have active addresses of clients in hub,
   // but to prevent from receiving your own messages I am gonna hold  actor ref -> name  map
@@ -48,10 +51,17 @@ class HubHandler extends Actor with ActorLogging {
     mutable.HashMap.empty[String, mutable.Set[InetSocketAddress]]
 
   // initialize default room
-  chatRoomsClients += ("default_room" -> mutable.LinkedHashSet[InetSocketAddress]())
+  chatRoomsClients += (HubHandler.defaultRoomName -> mutable.LinkedHashSet[InetSocketAddress]())
 
   val clientsChatRooms: mutable.Map[InetSocketAddress, mutable.Set[String]] =
     mutable.HashMap.empty[InetSocketAddress, mutable.Set[String]]
+
+  def serializeAndWrite(request: MessageRequest, connectionActor: ActorRef): Unit = {
+    request.serializeByteString match {
+      case Success(serializedRequest) => connectionActor ! Write(serializedRequest)
+      case Failure(e) => log.info(s"Message serialization has failed with: ${e.toString}")
+    }
+  }
 
   override def receive: Receive = {
     case HubHandler.Register(remoteAddress, connection) =>
@@ -59,56 +69,48 @@ class HubHandler extends Actor with ActorLogging {
 
       // deciding who will be handling data incoming from new connection
       connection ! Tcp.Register(self)
-      println("register in hub: " + connection)
 
       activeConnections += (remoteAddress -> connection)
       clientsChatRooms += (remoteAddress -> new mutable.LinkedHashSet[String]())
-      chatRoomsClients("default_room").add(remoteAddress)
+      chatRoomsClients(HubHandler.defaultRoomName).add(remoteAddress)
       log.info(s"New chat client has been registered: $remoteAddress")
 
     case HubHandler.Unregister(senderAddress) =>
       activeConnections -= senderAddress
       clientsChatRooms -= senderAddress
-      chatRoomsClients.foreach {
-        case (_, roomMembers) => roomMembers remove senderAddress
-      }
+      chatRoomsClients.foreach { case (_, roomMembers) => roomMembers remove senderAddress }
       log.info(s"Chat client has been unregistered: $senderAddress")
 
-    case HubHandler.Broadcast(senderAddress, senderName, message, roomName) =>
-      //log.info(s"Broadcasting message from $senderAddress ($senderName)") //TODO: Inet fix
-      log.info(s"Broadcasting message from $senderName") //alternatively
-    val users = chatRoomsClients(roomName).toList
-      println("users: ")
-      for (u <- users) {
-        println("user" + u)
-        val message_request = new Message.MessageRequest(Message.OtherClientMessage)
-        message_request("room") = roomName
-        message_request("sender") = senderName
-        message_request("message") = message
-        message_request.serializeByteString match {
-          case Success(value) =>
-            activeConnections(u) ! Write(value)
-          case Failure(exception) =>
-            log.info("FAILED")
-            throw exception
-        }
-        //        activeConnections(u) ! Write(ByteString("sender:" + senderName + " message: " + message))
-      }
-    //      activeConnections.foreach {
-    //        case (addr, _) if addr.equals(senderAddress) => //do not send back to the sender?
-    //        case (_, connection) => connection ! Write(ByteString("sender:" + senderName + " message: " + message))
-    //      }
+    case HubHandler.Broadcast(_, senderName, message, roomName) =>
+      val message_request = new Message.MessageRequest(Message.OtherClientMessage)
+      log.info(s"Broadcasting message from $senderName") // alternatively
 
+      message_request("room") = roomName
+      message_request("sender") = senderName
+      message_request("message") = message
+
+      message_request.serializeByteString match {
+        case Success(value) =>
+          chatRoomsClients(roomName).foreach(addr => activeConnections(addr) ! Write(value))
+        case Failure(exception) =>
+          log.info("Message serialization has failed")
+          throw exception
+      }
 
     case HubHandler.CreateRoom(senderAddress, roomName) =>
       //if such room already exists
       if (chatRoomsClients.keySet contains roomName) {
-        activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' already exists")
+
+        // TODO: TEST NOTIFICATION
+        print("Attempt to create another room with the same name")
+
+        val requestMap = Map("message" -> s"Chat room with name '$roomName' already exists")
+        val request = Message.prepareRequest(Message.Notification, requestMap)
+        serializeAndWrite(request, activeConnections(senderAddress))
       }
 
       //otherwise create new room with that name and add sender as a member of it
       else {
-        println("ROOM " + roomName + " added")
         clientsChatRooms(senderAddress) += roomName
         chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
@@ -117,23 +119,19 @@ class HubHandler extends Actor with ActorLogging {
 
     case HubHandler.JoinRoom(senderAddress, roomName) =>
       //if such room does not exist
-
-      println("JOOOOOINNNNN")
       if (!chatRoomsClients.keySet.contains(roomName)) {
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
       }
 
       //if the sender is already a member of such room
-      //      else if (clientsChatRooms(senderAddress) contains roomName) {
-      //        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
-      //      }
+      else if (clientsChatRooms(senderAddress) contains roomName) {
+        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
+      }
 
       //otherwise let sender join that room
       else {
         clientsChatRooms(senderAddress) += roomName
-        println("adding : " + senderAddress + " to: " + roomName)
         chatRoomsClients(roomName).add(senderAddress)
-        activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
         log.info(s"Client $senderAddress has joined the room '$roomName'")
       }
 
@@ -220,7 +218,6 @@ class HubHandler extends Actor with ActorLogging {
                   self ! LeaveRoom(key, name, roomName)
                 }
               }
-
             case _ =>
               println("Deserialization has succeeded, but message content is unknown")
           }
@@ -230,7 +227,11 @@ class HubHandler extends Actor with ActorLogging {
           throw exception
       }
 
+    case PeerClosed =>
+      log.info("Client has been disconnected")
+
     case _ =>
       log.info("Dude, some weird sh*t happened...")
   }
+
 }
