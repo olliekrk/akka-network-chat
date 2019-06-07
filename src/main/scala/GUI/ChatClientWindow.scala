@@ -42,6 +42,7 @@ object ChatClientWindow extends JFXApp {
   val chatOutputArea: TextArea = new TextArea {
     editable = false
     focusTraversable = false
+    style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
   }
 
   val chatInputField: TextField = new TextField {
@@ -75,6 +76,8 @@ object ChatClientWindow extends JFXApp {
 
   val createRoomButton: Button = new Button {
     text = "Create Room"
+    style = "-fx-background-color: #AE9797;"
+
   }
   createRoomButton.onAction = (e: ActionEvent) => {
     val rnd = new scala.util.Random
@@ -98,6 +101,7 @@ object ChatClientWindow extends JFXApp {
         val newTextArea = new TextArea {
           editable = false
           focusTraversable = false
+          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
         }
         val newTextField = new TextField {
           text.set("")
@@ -125,6 +129,7 @@ object ChatClientWindow extends JFXApp {
 
   val joinRoomButton: Button = new Button {
     text = "Join Room"
+    style = "-fx-background-color: #AE9797;"
   }
 
   joinRoomButton.onAction = (e: ActionEvent) => {
@@ -150,6 +155,7 @@ object ChatClientWindow extends JFXApp {
         val newTextArea = new TextArea {
           editable = false
           focusTraversable = false
+          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
         }
         val newTextField = new TextField {
           text.set("")
@@ -200,15 +206,21 @@ object ChatClientWindow extends JFXApp {
         spacing = 33
         padding = Insets(30)
         alignment = Pos.Center
-        style = "-fx-background-color: #2F99C2;"
+        // style = "-fx-background-color: #2F99C2;"
+        style = "-fx-background-color: #223162;"
 
         children = Seq(
           new Text {
-            text = "Hello Chat!" + loginDialog.username
+            text = "Hello Chat!"
             style = "-fx-font: bold 32pt sans-serif"
             fill = White
 
-          }, borderPane
+          }, borderPane,
+          new Text{
+            text = "logged as: " + loginDialog.username
+            style = "-fx-font: italic 16pt sans-serif"
+            fill = White
+          }
 
         )
       }
