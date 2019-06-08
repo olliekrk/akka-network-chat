@@ -140,6 +140,9 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
             case Message.AcceptCreateRoom =>
               val message = value("room").asInstanceOf[String]
               listenerGUI ! ClientGUIHandler.AcceptCreatingRoom(message)
+            case Message.AcceptJoinRoom =>
+              val message = value("room").asInstanceOf[String]
+              listenerGUI ! ClientGUIHandler.AcceptCreatingRoom(message)
             case _ =>
               log.info("WEIRD THING ???")
 

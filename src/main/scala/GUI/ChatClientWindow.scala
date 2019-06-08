@@ -160,11 +160,30 @@ object ChatClientWindow extends JFXApp {
 
     result match {
       case Some(name) =>
-        /* todo->  wait for result whether room can be added*/
         client ! ChatClient.CreateNewRoom(name)
+      case None => println("Room creation was canceled.")
+    }
+  }
+
+  def joinRoomAction(): Unit = {
+    val roomJoinDialog = new TextInputDialog() {
+      initOwner(stage)
+      title = "Join room"
+      headerText = "You can join existing room."
+      contentText = "Please enter its name:"
+    }
+
+    val result = roomJoinDialog.showAndWait()
+
+    result match {
+      case Some(name) =>
+        // todo -> wait for response,
+        client ! ChatClient.JoinNewRoom(name)
 //        val newTab = new Tab
 //        newTab.text = name
-//
+//        newTab.onClosed = handle(
+//          client ! ChatClient.LeaveRoom(name)
+//        )
 //        val newTextArea = new TextArea {
 //          editable = false
 //          focusTraversable = false
@@ -190,54 +209,6 @@ object ChatClientWindow extends JFXApp {
 //        activeRoomsInput += (name -> newTextField)
 //        tabPane.tabs += newTab
 //        println(name)
-      case None => println("Room creation was canceled.")
-    }
-  }
-
-  def joinRoomAction(): Unit = {
-    val roomJoinDialog = new TextInputDialog() {
-      initOwner(stage)
-      title = "Join room"
-      headerText = "You can join existing room."
-      contentText = "Please enter its name:"
-    }
-
-    val result = roomJoinDialog.showAndWait()
-
-    result match {
-      case Some(name) =>
-        // todo -> wait for response,
-        client ! ChatClient.JoinNewRoom(name)
-        val newTab = new Tab
-        newTab.text = name
-        newTab.onClosed = handle(
-          client ! ChatClient.LeaveRoom(name)
-        )
-        val newTextArea = new TextArea {
-          editable = false
-          focusTraversable = false
-          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
-        }
-        val newTextField = new TextField {
-          text.set("")
-          onKeyPressed = (a: KeyEvent) => a.code match {
-            case KeyCode.Enter =>
-              val message = text() + "\n"
-              text.set("")
-              sendMessage(message, name)
-            case _ =>
-          }
-        }
-        val tabChat: VBox = new VBox {
-          padding = Insets(5)
-          alignment = Pos.TopCenter
-          children = Seq(newTextArea, newTextField)
-        }
-        newTab.content = tabChat
-        activeRoomsOutput += (name -> newTextArea)
-        activeRoomsInput += (name -> newTextField)
-        tabPane.tabs += newTab
-        println(name)
       case None => println("Dialog was canceled.")
     }
   }
