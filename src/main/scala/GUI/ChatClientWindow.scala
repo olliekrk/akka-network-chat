@@ -116,6 +116,8 @@ object ChatClientWindow extends JFXApp {
 
   stage = new PrimaryStage {
     title = "Akka Network Chat"
+    minWidth = 900
+    minHeight = 600
     scene = new Scene(900, 600) {
       root = new VBox {
         spacing = 33
