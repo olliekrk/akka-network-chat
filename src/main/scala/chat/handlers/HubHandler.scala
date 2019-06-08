@@ -190,7 +190,11 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       clientNames -= activeConnections(senderAddress)
       activeConnections -= senderAddress
       clientsChatRooms -= senderAddress
-      chatRoomsClients.foreach { case (_, roomMembers) => roomMembers remove senderAddress }
+      chatRoomsClients.foreach {
+        case (roomName, roomMembers) =>
+          roomMembers -= senderAddress
+          if (roomMembers.isEmpty) chatRoomsClients -= roomName
+      }
       log.info(s"Chat client has been unregistered: $senderAddress")
 
     case _: HubHandler.HubRequest =>

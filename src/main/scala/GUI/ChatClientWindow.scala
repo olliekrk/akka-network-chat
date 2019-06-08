@@ -164,6 +164,7 @@ object ChatClientWindow extends JFXApp {
   }
 
   client ! ChatClient.SetUsername(loginDialog.username)
+  Platform.runLater(() => chatInputField.requestFocus())
 
   def sendMessage(message: String, room: String): Unit = {
     client ! ChatClient.UserMessage(message, room)
