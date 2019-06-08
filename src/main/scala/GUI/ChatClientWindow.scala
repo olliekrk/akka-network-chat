@@ -144,7 +144,6 @@ object ChatClientWindow extends JFXApp {
   client ! ChatClient.SetUsername(loginDialog.username)
 
   def sendMessage(message: String, room: String): Unit = {
-    println("Sending: " + message + " to room: " + room)
     client ! ChatClient.UserMessage(message, room)
   }
 
@@ -223,7 +222,6 @@ object ChatClientWindow extends JFXApp {
             activeRoomsOutput += (room -> newTextArea)
             activeRoomsInput += (room -> newTextField)
             tabPane.tabs += newTab
-            println(room)
   }
 
 }

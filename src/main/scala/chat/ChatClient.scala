@@ -47,7 +47,6 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
 
     case c@Tcp.CommandFailed(_: Connect) =>
       listenerGUI ! ChatNotification("Tcp.Connect command has failed")
-      println(c)
       context.stop(self)
 
     case Tcp.Connected(`remote`, localAddress) =>
@@ -64,7 +63,7 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
 
   def signingIn(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case SetUsername(name) =>
-      println(s"Client name has been set to:\t $name")
+      log.info(s"Client name has been set to:\t $name")
       context.become(chatting(name, connection, localAddress))
     case _ =>
       log.info("Unknown message received while signing in...")
@@ -73,14 +72,12 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
   def chatting(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     // sends messages from input to all clients in default hub
     case UserMessage(message, room) =>
-      println("IN CC: " + message + room)
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
       message_request("room") = room
       message_request.serializeByteString match {
         case Success(value) =>
-          println("SENT!")
           connection ! Write(value)
         case Failure(exception) =>
           log.info("FAILED")

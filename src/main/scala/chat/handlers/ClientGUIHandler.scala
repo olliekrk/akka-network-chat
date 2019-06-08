@@ -32,10 +32,8 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
       val dateTime = dateTimeFormatter.format(Calendar.getInstance.getTime)
       chatOutputAreas(room).appendText(s"[$dateTime] Message from $name:\n\t$message")
     case ChatNotification(message) =>
-      print(message)
       Platform.runLater(() => ChatClientWindow.warningDialog(message))
     case AcceptCreatingRoom(room) =>
-      println("accepted " + room)
       Platform.runLater(() => ChatClientWindow.addTab(room))
     case _ =>
     //      chatOutputAreas(room).appendText("Unknown message received")
