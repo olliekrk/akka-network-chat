@@ -57,11 +57,83 @@ class HubHandler extends Actor with ActorLogging {
     }
   }
 
-  def broadcastMessage(senderName: String, message: String, roomName: String): Unit = {
+  def doBroadcast(senderName: String, message: String, roomName: String): Unit = {
     val requestMap = Map("room" -> roomName, "sender" -> senderName, "message" -> message)
     val request = Message.prepareRequest(Message.OtherClientMessage, requestMap)
     log.info(s"Broadcasting message from $senderName")
     chatRoomsClients(roomName).foreach({ addr => serializeAndWrite(request, activeConnections(addr)) })
+  }
+
+  def createRoom(senderAddress: InetSocketAddress, roomName: String): Unit = {
+    if (chatRoomsClients.keySet contains roomName) {
+      log.warning("Attempt to create another room with the same name")
+      val requestMap = Map("message" -> s"Chat room with name '$roomName' can be create")
+      val request = Message.prepareRequest(Message.Notification, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+    }
+    //otherwise create new room with that name and add sender as a member of it
+    else {
+      clientsChatRooms(senderAddress) += roomName
+      chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
+      activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
+      val requestMap = Map("room" -> roomName)
+      val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+      log.info(s"Chat room with name '$roomName' has been created")
+    }
+  }
+
+  def doJoinRoom(senderAddress: InetSocketAddress, roomName: String): Unit = {
+    //if such room does not exist
+    if (!chatRoomsClients.keySet.contains(roomName)) {
+      activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
+      val requestMap = Map("message" -> s"Chat room with name '$roomName' does not exist")
+      val request = Message.prepareRequest(Message.Notification, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+    }
+
+    //if the sender is already a member of such room
+    else if (clientsChatRooms(senderAddress) contains roomName) {
+      activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
+      val requestMap = Map("message" -> s"You are already member of: '$roomName' ")
+      val request = Message.prepareRequest(Message.Notification, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+    }
+
+    //otherwise let sender join that room
+    else {
+      clientsChatRooms(senderAddress) += roomName
+      chatRoomsClients(roomName).add(senderAddress)
+      log.info(s"Client $senderAddress has joined the room '$roomName'")
+      val requestMap = Map("room" -> roomName)
+      val request = Message.prepareRequest(Message.AcceptJoinRoom, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+    }
+  }
+
+  def doLeaveRoom(senderAddress: InetSocketAddress, senderName: String, roomName: String): Unit ={
+    //if such room does not exist
+    if (!chatRoomsClients.keySet.contains(roomName))
+      activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
+
+    //if sender is not a member of a chat room
+    else if (!chatRoomsClients(roomName).contains(senderAddress))
+      activeConnections(senderAddress) ! ChatNotification(s"You are not a member of room '$roomName'")
+
+    //otherwise leave the room
+    else {
+      chatRoomsClients(roomName) -= senderAddress
+      clientsChatRooms(senderAddress) -= roomName
+      activeConnections(senderAddress) ! ChatNotification(s"You have left the room '$roomName'")
+      chatRoomsClients(roomName).foreach { address =>
+        activeConnections(address) ! ChatNotification(s"$senderName has left the room")
+      }
+
+      //if there are no members left delete that room
+      if (chatRoomsClients(roomName).isEmpty) {
+        chatRoomsClients -= roomName
+      }
+    }
   }
 
   override def receive: Receive = {
@@ -82,92 +154,6 @@ class HubHandler extends Actor with ActorLogging {
       chatRoomsClients.foreach { case (_, roomMembers) => roomMembers remove senderAddress }
       log.info(s"Chat client has been unregistered: $senderAddress")
 
-    case HubHandler.Broadcast(_, senderName, message, roomName) =>
-      val message_request = new Message.MessageRequest(Message.OtherClientMessage)
-      log.info(s"Broadcasting message from $senderName") // alternatively
-
-      message_request("room") = roomName
-      message_request("sender") = senderName
-      message_request("message") = message
-
-      message_request.serializeByteString match {
-        case Success(value) =>
-          chatRoomsClients(roomName).foreach(addr => activeConnections(addr) ! Write(value))
-        case Failure(exception) =>
-          log.info("Message serialization has failed")
-          throw exception
-      }
-
-    case HubHandler.CreateRoom(senderAddress, roomName) =>
-      //if such room already exists
-      if (chatRoomsClients.keySet contains roomName) {
-        log.warning("Attempt to create another room with the same name")
-        val requestMap = Map("message" -> s"Chat room with name '$roomName' can be create")
-        val request = Message.prepareRequest(Message.Notification, requestMap)
-        serializeAndWrite(request, activeConnections(senderAddress))
-      }
-      //otherwise create new room with that name and add sender as a member of it
-      else {
-        clientsChatRooms(senderAddress) += roomName
-        chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
-        val requestMap = Map("room" -> roomName)
-        val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
-        serializeAndWrite(request, activeConnections(senderAddress))
-        log.info(s"Chat room with name '$roomName' has been created")
-      }
-
-    case HubHandler.JoinRoom(senderAddress, roomName) =>
-      //if such room does not exist
-      if (!chatRoomsClients.keySet.contains(roomName)) {
-        activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
-        val requestMap = Map("message" -> s"Chat room with name '$roomName' does not exist")
-        val request = Message.prepareRequest(Message.Notification, requestMap)
-        serializeAndWrite(request, activeConnections(senderAddress))
-      }
-
-      //if the sender is already a member of such room
-      else if (clientsChatRooms(senderAddress) contains roomName) {
-        activeConnections(senderAddress) ! ChatNotification(s"You are already a member of chat room '$roomName'")
-        val requestMap = Map("message" -> s"You are already member of: '$roomName' ")
-        val request = Message.prepareRequest(Message.Notification, requestMap)
-        serializeAndWrite(request, activeConnections(senderAddress))
-      }
-
-      //otherwise let sender join that room
-      else {
-        clientsChatRooms(senderAddress) += roomName
-        chatRoomsClients(roomName).add(senderAddress)
-        log.info(s"Client $senderAddress has joined the room '$roomName'")
-        val requestMap = Map("room" -> roomName)
-        val request = Message.prepareRequest(Message.AcceptJoinRoom, requestMap)
-        serializeAndWrite(request, activeConnections(senderAddress))
-      }
-
-
-    case HubHandler.LeaveRoom(senderAddress, senderName, roomName) =>
-      //if such room does not exist
-      if (!chatRoomsClients.keySet.contains(roomName))
-        activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' does not exist")
-
-      //if sender is not a member of a chat room
-      else if (!chatRoomsClients(roomName).contains(senderAddress))
-        activeConnections(senderAddress) ! ChatNotification(s"You are not a member of room '$roomName'")
-
-      //otherwise leave the room
-      else {
-        chatRoomsClients(roomName) -= senderAddress
-        clientsChatRooms(senderAddress) -= roomName
-        activeConnections(senderAddress) ! ChatNotification(s"You have left the room '$roomName'")
-        chatRoomsClients(roomName).foreach { address =>
-          activeConnections(address) ! ChatNotification(s"$senderName has left the room")
-        }
-
-        //if there are no members left delete that room
-        if (chatRoomsClients(roomName).isEmpty) {
-          chatRoomsClients -= roomName
-        }
-      }
-
     case _: HubHandler.HubRequest =>
       log.warning("Request handler not yet implemented")
 
@@ -182,20 +168,19 @@ class HubHandler extends Actor with ActorLogging {
               if (!(clientNames contains sender())) {
                 clientNames(sender()) = name
               }
-              this.broadcastMessage(name, msg, roomName)
+              doBroadcast(name, msg, roomName)
             case Message.CreateRoom =>
               val roomName = value("room").asInstanceOf[String]
-
               for ((key, value) <- activeConnections) {
                 if (sender() == value) {
-                  self ! CreateRoom(key, roomName)
+                  createRoom(key, roomName)
                 }
               }
             case Message.JoinRoom =>
               val roomName = value("room").asInstanceOf[String]
               for ((key, value) <- activeConnections) {
                 if (sender() == value) {
-                  self ! JoinRoom(key, roomName)
+                  doJoinRoom(key, roomName)
                 }
               }
             case Message.LeaveRoom =>
@@ -203,15 +188,15 @@ class HubHandler extends Actor with ActorLogging {
               val roomName = value("room").asInstanceOf[String]
               for ((key, value) <- activeConnections) {
                 if (sender() == value) {
-                  self ! LeaveRoom(key, name, roomName)
+                  doLeaveRoom(key, name, roomName)
                 }
               }
             case _ =>
-              println("Deserialization has succeeded, but message content is unknown")
+              log.info("Deserialization has succeeded, but message content is unknown")
           }
 
         case Failure(exception) =>
-          println("Deserialization has failed")
+          log.info("Deserialization has failed")
           throw exception
       }
 
