@@ -5,7 +5,6 @@ import akka.serialization._
 import akka.util.ByteString
 
 import scala.collection.mutable
-import scala.collection.parallel.immutable
 import scala.util.Try
 
 object Message {
@@ -16,7 +15,8 @@ object Message {
   val JoinRoom = "JoinRoom"
   val CreateRoom = "CreateRoom"
   val OtherClientMessage = "OtherClientMessage"
-  val Notification = "ChatNotification"
+  val ChatNotification = "ChatNotification"
+  val RoomNotification = "RoomNotification"
   val AcceptCreateRoom = "AcceptCreateRoom"
   val AcceptJoinRoom = "AcceptJoinRoom"
 

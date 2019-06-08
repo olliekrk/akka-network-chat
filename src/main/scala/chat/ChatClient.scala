@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import chat.handlers.{ClientGUIHandler, HubHandler}
+import chat.handlers.ClientGUIHandler
 import chat.handlers.ClientGUIHandler.ChatNotification
 
 import scala.util.{Failure, Success}
@@ -131,17 +131,21 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
               } else {
                 listenerGUI ! ClientGUIHandler.ChatMessage(sender, msg, roomName)
               }
-            case Message.Notification =>
+            case Message.ChatNotification =>
               val message = value("message").asInstanceOf[String]
               listenerGUI ! ClientGUIHandler.ChatNotification(message)
             case Message.AcceptCreateRoom =>
-              val message = value("room").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.AcceptCreatingRoom(message)
+              val roomName = value("room").asInstanceOf[String]
+              listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
             case Message.AcceptJoinRoom =>
-              val message = value("room").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.AcceptCreatingRoom(message)
+              val roomName = value("room").asInstanceOf[String]
+              listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
+            case Message.RoomNotification =>
+              val roomName = value("room").asInstanceOf[String]
+              val message = value("message").asInstanceOf[String]
+              listenerGUI ! ClientGUIHandler.RoomNotification(message, roomName)
             case _ =>
-              log.info("WEIRD THING ???")
+              log.info("Unknown message received and deserialized")
 
           }
         case Failure(_) =>

@@ -32,11 +32,22 @@ object GUIStyles {
       "-fx-background-radius: 3,2,2,2;" +
       "-fx-padding: 12 30 12 30;" +
       "-fx-text-fill: white;" +
-      "-fx-font-size: 12px;"
+      "-fx-font: bold 12pt sans-serif;"
 
   val commonTextStyle: String =
-    "-fx-font: bold 10pt sans-serif;" +
-      "-fx-background-color: #B6AFAF;"
+    "font-family: Verdana;" +
+      "font-size: 11px;" +
+      "color: #555555;" +
+      "line-height: 1.5;" +
+      "letter-spacing: .25px;"
+
+  val tabPaneStyle: String =
+    "-fx-background-color:" +
+      "-fx-outer-border," +
+      "-fx-inner-border," +
+      "derive(-fx-color, -20%);" +
+      "-fx-effect: " +
+      "innershadow(two-pass-box , rgba(0,0,0,0.6) , 4, 0.0 , 0 , 0);"
 }
 
 object ChatClientWindow extends JFXApp {
@@ -47,6 +58,7 @@ object ChatClientWindow extends JFXApp {
   implicit def system: ActorSystem = actorSystem
 
   val loginDialog = LoginDialog(stage)
+
   loginDialog.initializeDialog()
 
   val chatOutputArea: TextArea = new TextArea {
@@ -81,6 +93,7 @@ object ChatClientWindow extends JFXApp {
 
   val tabPane: TabPane = new TabPane {
     tabs = List(defaultRoomTab) // to distinguish rooms of current active client
+    style = GUIStyles.tabPaneStyle
   }
 
   val activeRoomsOutput: mutable.Map[String, TextArea] = mutable.Map.empty[String, TextArea]
@@ -90,6 +103,7 @@ object ChatClientWindow extends JFXApp {
   val client: ActorRef = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
 
   activeRoomsOutput += (HubHandler.defaultRoomName -> chatOutputArea)
+
   activeRoomsInput += (HubHandler.defaultRoomName -> chatInputField)
 
   val createRoomButton: Button = new Button {
