@@ -17,6 +17,7 @@ object Message {
   val CreateRoom = "CreateRoom"
   val OtherClientMessage = "OtherClientMessage"
   val Notification = "ChatNotification"
+  val AcceptCreateRoom = "AcceptCreateRoom"
 
   object MessageRequest {
     def serialize(obj: AnyRef)(implicit system: ActorSystem): Try[Array[Byte]] = {

@@ -103,8 +103,7 @@ class HubHandler extends Actor with ActorLogging {
 
         // TODO: NOTIFICATION EXAMPLE
         log.warning("Attempt to create another room with the same name")
-
-        val requestMap = Map("message" -> s"Chat room with name '$roomName' already exists")
+        val requestMap = Map("message" -> s"Chat room with name '$roomName' can be create")
         val request = Message.prepareRequest(Message.Notification, requestMap)
         serializeAndWrite(request, activeConnections(senderAddress))
       }
@@ -114,6 +113,10 @@ class HubHandler extends Actor with ActorLogging {
         clientsChatRooms(senderAddress) += roomName
         chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
+        val requestMap = Map("room" -> roomName)
+        println("lol: "+ requestMap("room"))
+        val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
+        serializeAndWrite(request, activeConnections(senderAddress))
         log.info(s"Chat room with name '$roomName' has been created")
       }
 

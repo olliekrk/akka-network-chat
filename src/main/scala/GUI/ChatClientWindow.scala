@@ -45,11 +45,7 @@ object ChatClientWindow extends JFXApp {
   val loginDialog = LoginDialog(stage)
   loginDialog.initializeDialog()
 
-  val activeRoomsOutput: mutable.Map[String, TextArea] = mutable.Map.empty[String, TextArea]
-  val activeRoomsInput: mutable.Map[String, TextField] = mutable.Map.empty[String, TextField]
-  val serverAddress = new InetSocketAddress(loginDialog.hostname, loginDialog.port)
-  val clientHandler: ActorRef = actorSystem.actorOf(ClientGUIHandler.props(activeRoomsOutput))
-  val client: ActorRef = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
+
 
   val chatOutputArea: TextArea = new TextArea {
     editable = false
@@ -84,6 +80,12 @@ object ChatClientWindow extends JFXApp {
   val tabPane: TabPane = new TabPane {
     tabs = List(defaultRoomTab) // to distinguish rooms of current active client
   }
+
+  val activeRoomsOutput: mutable.Map[String, TextArea] = mutable.Map.empty[String, TextArea]
+  val activeRoomsInput: mutable.Map[String, TextField] = mutable.Map.empty[String, TextField]
+  val serverAddress = new InetSocketAddress(loginDialog.hostname, loginDialog.port)
+  val clientHandler: ActorRef = actorSystem.actorOf(ClientGUIHandler.props(activeRoomsOutput))
+  val client: ActorRef = actorSystem.actorOf(ChatClient.props(serverAddress, clientHandler))
 
   activeRoomsOutput += (HubHandler.defaultRoomName -> chatOutputArea)
   activeRoomsInput += (HubHandler.defaultRoomName -> chatInputField)
@@ -160,34 +162,34 @@ object ChatClientWindow extends JFXApp {
       case Some(name) =>
         /* todo->  wait for result whether room can be added*/
         client ! ChatClient.CreateNewRoom(name)
-        val newTab = new Tab
-        newTab.text = name
-
-        val newTextArea = new TextArea {
-          editable = false
-          focusTraversable = false
-          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
-        }
-        val newTextField = new TextField {
-          text.set("")
-          onKeyPressed = (a: KeyEvent) => a.code match {
-            case KeyCode.Enter =>
-              val message = text() + "\n"
-              text.set("")
-              sendMessage(message, name)
-            case _ =>
-          }
-        }
-        val tabChat: VBox = new VBox {
-          padding = Insets(5)
-          alignment = Pos.TopCenter
-          children = Seq(newTextArea, newTextField)
-        }
-        newTab.content = tabChat
-        activeRoomsOutput += (name -> newTextArea)
-        activeRoomsInput += (name -> newTextField)
-        tabPane.tabs += newTab
-        println(name)
+//        val newTab = new Tab
+//        newTab.text = name
+//
+//        val newTextArea = new TextArea {
+//          editable = false
+//          focusTraversable = false
+//          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
+//        }
+//        val newTextField = new TextField {
+//          text.set("")
+//          onKeyPressed = (a: KeyEvent) => a.code match {
+//            case KeyCode.Enter =>
+//              val message = text() + "\n"
+//              text.set("")
+//              sendMessage(message, name)
+//            case _ =>
+//          }
+//        }
+//        val tabChat: VBox = new VBox {
+//          padding = Insets(5)
+//          alignment = Pos.TopCenter
+//          children = Seq(newTextArea, newTextField)
+//        }
+//        newTab.content = tabChat
+//        activeRoomsOutput += (name -> newTextArea)
+//        activeRoomsInput += (name -> newTextField)
+//        tabPane.tabs += newTab
+//        println(name)
       case None => println("Room creation was canceled.")
     }
   }
@@ -247,6 +249,37 @@ object ChatClientWindow extends JFXApp {
       headerText = "Your request is invalid"
       contentText = message
     }.showAndWait()
+  }
+
+  def addTab(room: String) = {
+            val newTab = new Tab
+            newTab.text = room
+
+            val newTextArea = new TextArea {
+              editable = false
+              focusTraversable = false
+              style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
+            }
+            val newTextField = new TextField {
+              text.set("")
+              onKeyPressed = (a: KeyEvent) => a.code match {
+                case KeyCode.Enter =>
+                  val message = text() + "\n"
+                  text.set("")
+                  sendMessage(message, room)
+                case _ =>
+              }
+            }
+            val tabChat: VBox = new VBox {
+              padding = Insets(5)
+              alignment = Pos.TopCenter
+              children = Seq(newTextArea, newTextField)
+            }
+            newTab.content = tabChat
+            activeRoomsOutput += (room -> newTextArea)
+            activeRoomsInput += (room -> newTextField)
+            tabPane.tabs += newTab
+            println(room)
   }
 
 }

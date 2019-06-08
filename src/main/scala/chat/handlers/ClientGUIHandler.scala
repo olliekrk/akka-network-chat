@@ -19,6 +19,8 @@ object ClientGUIHandler {
 
   case class ChatNotification(message: String) extends ClientRequest
 
+  case class AcceptCreatingRoom(message: String) extends ClientRequest
+
   def props(chatOutputAreas: mutable.Map[String, TextArea]) = Props(new ClientGUIHandler(chatOutputAreas))
 
 }
@@ -32,6 +34,9 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
     case ChatNotification(message) =>
       print(message)
       Platform.runLater(() => ChatClientWindow.warningDialog(message))
+    case AcceptCreatingRoom(room) =>
+      println("accepted " + room)
+      Platform.runLater(() => ChatClientWindow.addTab(room))
     case _ =>
     //      chatOutputAreas(room).appendText("Unknown message received")
   }
