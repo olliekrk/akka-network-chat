@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp.{PeerClosed, Received, Write}
-import chat.Message
+import chat.{Message, RequestSerialization}
 import chat.Message.MessageRequest
 
 import scala.collection.mutable
@@ -23,7 +23,7 @@ object HubHandler {
 
 }
 
-class HubHandler extends Actor with ActorLogging {
+class HubHandler extends Actor with ActorLogging with RequestSerialization {
 
   import context.system
 
@@ -38,7 +38,45 @@ class HubHandler extends Actor with ActorLogging {
   // initialize default room
   chatRoomsClients += (HubHandler.defaultRoomName -> mutable.LinkedHashSet[InetSocketAddress]())
 
-  def serializeAndWrite(request: MessageRequest, connectionActor: ActorRef): Unit = {
+  override def handleDeserializedRequest(connectionActor: ActorRef, messageRequest: MessageRequest): Unit = {
+    messageRequest.request match {
+      case Message.ClientMessage =>
+        val msg = messageRequest("message").asInstanceOf[String]
+        val name = messageRequest("name").asInstanceOf[String]
+        val roomName = messageRequest("room").asInstanceOf[String]
+        clientNames(connectionActor) = name
+        broadcastRoom(name, msg, roomName)
+
+      case Message.CreateRoom =>
+        val roomName = messageRequest("room").asInstanceOf[String]
+        for ((key, value) <- activeConnections)
+          if (connectionActor == value)
+            createRoom(key, roomName)
+
+      case Message.JoinRoom =>
+        val roomName = messageRequest("room").asInstanceOf[String]
+        for ((key, value) <- activeConnections)
+          if (connectionActor == value)
+            doJoinRoom(key, roomName)
+
+      case Message.LeaveRoom =>
+        val name = messageRequest("name").asInstanceOf[String]
+        val roomName = messageRequest("room").asInstanceOf[String]
+        for ((key, value) <- activeConnections)
+          if (connectionActor == value)
+            doLeaveRoom(key, name, roomName)
+
+      case Message.Unregister =>
+        for ((address, actor) <- activeConnections)
+          if (connectionActor == actor)
+            self ! HubHandler.Unregister(address)
+
+      case _ =>
+        log.info("Deserialization has succeeded, but message content is unknown")
+    }
+  }
+
+  override def serializeAndWrite(request: MessageRequest, connectionActor: ActorRef): Unit = {
     request.serializeByteString match {
       case Success(serializedRequest) => connectionActor ! Write(serializedRequest)
       case Failure(e) => log.info(s"Message serialization has failed with: ${e.toString}")
@@ -134,39 +172,6 @@ class HubHandler extends Actor with ActorLogging {
       //if there are no members left delete that room
       if (chatRoomsClients(roomName).isEmpty) chatRoomsClients -= roomName
 
-    }
-  }
-
-  def handleDeserializedRequest(connectionActor: ActorRef, value: MessageRequest): Unit = {
-    value.request match {
-      case Message.ClientMessage =>
-        val msg = value("message").asInstanceOf[String]
-        val name = value("name").asInstanceOf[String]
-        val roomName = value("room").asInstanceOf[String]
-        clientNames(connectionActor) = name
-        broadcastRoom(name, msg, roomName)
-
-      case Message.CreateRoom =>
-        val roomName = value("room").asInstanceOf[String]
-        for ((key, value) <- activeConnections)
-          if (connectionActor == value)
-            createRoom(key, roomName)
-
-      case Message.JoinRoom =>
-        val roomName = value("room").asInstanceOf[String]
-        for ((key, value) <- activeConnections)
-          if (connectionActor == value)
-            doJoinRoom(key, roomName)
-
-      case Message.LeaveRoom =>
-        val name = value("name").asInstanceOf[String]
-        val roomName = value("room").asInstanceOf[String]
-        for ((key, value) <- activeConnections)
-          if (connectionActor == value)
-            doLeaveRoom(key, name, roomName)
-
-      case _ =>
-        log.info("Deserialization has succeeded, but message content is unknown")
     }
   }
 

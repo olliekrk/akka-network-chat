@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
+import chat.Message.MessageRequest
 import chat.handlers.ClientGUIHandler
 import chat.handlers.ClientGUIHandler.ChatNotification
 
@@ -24,15 +25,13 @@ object ChatClient {
 
   case class LeaveRoom(roomName: String) extends ChatClientCommand
 
-  case object UserConnect extends ChatClientCommand
-
-  case object UserDisconnect extends ChatClientCommand
+  case object UserUnregister extends ChatClientCommand
 
   def props(remote: InetSocketAddress, listener: ActorRef) =
     Props(new ChatClient(remote, listener))
 }
 
-class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor with ActorLogging {
+class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor with ActorLogging with RequestSerialization {
 
   import ChatClient._
   import akka.io.Tcp._
@@ -43,9 +42,10 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
   val connectionTimeout: FiniteDuration = 30.seconds
   IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
 
-  override def receive: Receive = {
+  var clientName: Option[String] = None
 
-    case c@Tcp.CommandFailed(_: Connect) =>
+  override def receive: Receive = {
+    case Tcp.CommandFailed(_: Connect) =>
       listenerGUI ! ChatNotification("Tcp.Connect command has failed")
       context.stop(self)
 
@@ -61,99 +61,94 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
       self ! other
   }
 
+  override def serializeAndWrite(request: MessageRequest, connectionActor: ActorRef): Unit = {
+    request.serializeByteString match {
+      case Success(serializedRequest) => connectionActor ! Write(serializedRequest)
+      case Failure(e) => log.info(s"Message serialization has failed with: ${e.toString}")
+    }
+  }
+
+  override def handleDeserializedRequest(connectionActor: ActorRef, messageRequest: MessageRequest): Unit = {
+    messageRequest.request match {
+      case Message.OtherClientMessage =>
+        val msg = messageRequest("message").asInstanceOf[String]
+        val sender = messageRequest("sender").asInstanceOf[String]
+        val roomName = messageRequest("room").asInstanceOf[String]
+
+        if (sender == clientName.getOrElse(""))
+          listenerGUI ! ClientGUIHandler.ChatMessage(sender, msg, roomName)
+        else
+          listenerGUI ! ClientGUIHandler.ChatMessage(sender, msg, roomName)
+
+      case Message.ChatNotification =>
+        val message = messageRequest("message").asInstanceOf[String]
+        listenerGUI ! ClientGUIHandler.ChatNotification(message)
+
+      case Message.AcceptCreateRoom =>
+        val roomName = messageRequest("room").asInstanceOf[String]
+        listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
+
+      case Message.AcceptJoinRoom =>
+        val roomName = messageRequest("room").asInstanceOf[String]
+        listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
+
+      case Message.RoomNotification =>
+        val roomName = messageRequest("room").asInstanceOf[String]
+        val message = messageRequest("message").asInstanceOf[String]
+        listenerGUI ! ClientGUIHandler.RoomNotification(message, roomName)
+
+      case _ =>
+        log.info("Unknown message received and deserialized")
+
+    }
+  }
+
   def signingIn(connection: ActorRef, localAddress: InetSocketAddress): Receive = {
     case SetUsername(name) =>
       log.info(s"Client name has been set to:\t $name")
+      clientName = Some(name)
       context.become(chatting(name, connection, localAddress))
     case _ =>
       log.info("Unknown message received while signing in...")
   }
 
   def chatting(name: String, connection: ActorRef, localAddress: InetSocketAddress): Receive = {
-    // sends messages from input to all clients in default hub
     case UserMessage(message, room) =>
       val message_request = new Message.MessageRequest(Message.ClientMessage)
       message_request("name") = name
       message_request("message") = message
       message_request("room") = room
-      message_request.serializeByteString match {
-        case Success(value) =>
-          connection ! Write(value)
-        case Failure(exception) =>
-          log.info("FAILED")
-          throw exception
-      }
+      serializeAndWrite(message_request, connection)
+
     case CreateNewRoom(roomName) =>
       val message_request = new Message.MessageRequest(Message.CreateRoom)
       message_request("room") = roomName
-      message_request.serializeByteString match {
-        case Success(value) =>
-          connection ! Write(value)
-        case Failure(exception) =>
-          log.info("FAILED")
-          throw exception
-      }
+      serializeAndWrite(message_request, connection)
 
     case JoinNewRoom(roomName) =>
       val message_request = new Message.MessageRequest(Message.JoinRoom)
       message_request("room") = roomName
-      message_request.serializeByteString match {
-        case Success(value) =>
-          connection ! Write(value)
-        case Failure(exception) =>
-          log.info("FAILED")
-          throw exception
-      }
+      serializeAndWrite(message_request, connection)
 
     case LeaveRoom(roomName) =>
       val message_request = new Message.MessageRequest(Message.LeaveRoom)
       message_request("room") = roomName
       message_request("name") = name
-      message_request.serializeByteString match {
-        case Success(value) =>
-          connection ! Write(value)
-        case Failure(exception) =>
-          log.info("FAILED")
-          throw exception
-      }
+      serializeAndWrite(message_request, connection)
+
+    case UserUnregister =>
+      val request = new chat.Message.MessageRequest(Message.Unregister)
+      serializeAndWrite(request, connection)
 
     case Received(data) =>
       Message.MessageRequest.deserializeByteString(data) match {
-        case Success(value) =>
-          value.request match {
-            case Message.OtherClientMessage =>
-              val msg = value("message").asInstanceOf[String]
-              val sender = value("sender").asInstanceOf[String]
-              val roomName = value("room").asInstanceOf[String]
-
-              if (sender == name) {
-                listenerGUI ! ClientGUIHandler.ChatMessage("YOU", msg, roomName)
-              } else {
-                listenerGUI ! ClientGUIHandler.ChatMessage(sender, msg, roomName)
-              }
-            case Message.ChatNotification =>
-              val message = value("message").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.ChatNotification(message)
-            case Message.AcceptCreateRoom =>
-              val roomName = value("room").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
-            case Message.AcceptJoinRoom =>
-              val roomName = value("room").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
-            case Message.RoomNotification =>
-              val roomName = value("room").asInstanceOf[String]
-              val message = value("message").asInstanceOf[String]
-              listenerGUI ! ClientGUIHandler.RoomNotification(message, roomName)
-            case _ =>
-              log.info("Unknown message received and deserialized")
-
-          }
-        case Failure(_) =>
-          log.info("Deserialization has failed")
+        case Success(value) => handleDeserializedRequest(sender(), value)
+        case Failure(_) => log.info("Message deserialization has failed")
       }
 
-  }
 
+    case _ => log.warning("Received unknown request while chatting")
+  }
 
 }
 

@@ -14,6 +14,7 @@ object Message {
   val LeaveRoom = "LeaveRoom"
   val JoinRoom = "JoinRoom"
   val CreateRoom = "CreateRoom"
+  val Unregister = "Unregister"
   val OtherClientMessage = "OtherClientMessage"
   val ChatNotification = "ChatNotification"
   val RoomNotification = "RoomNotification"

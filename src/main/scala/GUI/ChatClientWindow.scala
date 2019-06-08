@@ -155,6 +155,8 @@ object ChatClientWindow extends JFXApp {
           })
       }
     }
+
+    onCloseRequest = _ => client ! ChatClient.UserUnregister
   }
 
   client ! ChatClient.SetUsername(loginDialog.username)
