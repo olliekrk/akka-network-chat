@@ -179,36 +179,6 @@ object ChatClientWindow extends JFXApp {
       case Some(name) =>
         // todo -> wait for response,
         client ! ChatClient.JoinNewRoom(name)
-//        val newTab = new Tab
-//        newTab.text = name
-//        newTab.onClosed = handle(
-//          client ! ChatClient.LeaveRoom(name)
-//        )
-//        val newTextArea = new TextArea {
-//          editable = false
-//          focusTraversable = false
-//          style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
-//        }
-//        val newTextField = new TextField {
-//          text.set("")
-//          onKeyPressed = (a: KeyEvent) => a.code match {
-//            case KeyCode.Enter =>
-//              val message = text() + "\n"
-//              text.set("")
-//              sendMessage(message, name)
-//            case _ =>
-//          }
-//        }
-//        val tabChat: VBox = new VBox {
-//          padding = Insets(5)
-//          alignment = Pos.TopCenter
-//          children = Seq(newTextArea, newTextField)
-//        }
-//        newTab.content = tabChat
-//        activeRoomsOutput += (name -> newTextArea)
-//        activeRoomsInput += (name -> newTextField)
-//        tabPane.tabs += newTab
-//        println(name)
       case None => println("Dialog was canceled.")
     }
   }
@@ -247,6 +217,7 @@ object ChatClientWindow extends JFXApp {
               children = Seq(newTextArea, newTextField)
             }
             newTab.content = tabChat
+            newTab.onClosed = handle(client ! ChatClient.LeaveRoom(room))
             activeRoomsOutput += (room -> newTextArea)
             activeRoomsInput += (room -> newTextField)
             tabPane.tabs += newTab

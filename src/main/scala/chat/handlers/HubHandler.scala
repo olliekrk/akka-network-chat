@@ -111,7 +111,6 @@ class HubHandler extends Actor with ActorLogging {
         chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
         activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
         val requestMap = Map("room" -> roomName)
-        println("lol: "+ requestMap("room"))
         val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
         serializeAndWrite(request, activeConnections(senderAddress))
         log.info(s"Chat room with name '$roomName' has been created")
@@ -157,7 +156,7 @@ class HubHandler extends Actor with ActorLogging {
       //otherwise leave the room
       else {
         chatRoomsClients(roomName) -= senderAddress
-
+        clientsChatRooms(senderAddress) -= roomName
         activeConnections(senderAddress) ! ChatNotification(s"You have left the room '$roomName'")
         chatRoomsClients(roomName).foreach { address =>
           activeConnections(address) ! ChatNotification(s"$senderName has left the room")
@@ -183,7 +182,6 @@ class HubHandler extends Actor with ActorLogging {
               if (!(clientNames contains sender())) {
                 clientNames(sender()) = name
               }
-              println("BROADCASTING IN : " + roomName)
               self ! Broadcast(new InetSocketAddress("somewhere", 0), name, msg, roomName) //TODO: same Inet fix
             case Message.CreateRoom =>
               val roomName = value("room").asInstanceOf[String]
@@ -194,7 +192,6 @@ class HubHandler extends Actor with ActorLogging {
                 }
               }
             case Message.JoinRoom =>
-              println("JOINING")
               val roomName = value("room").asInstanceOf[String]
               for ((key, value) <- activeConnections) {
                 if (sender() == value) {
