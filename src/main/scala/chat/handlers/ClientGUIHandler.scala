@@ -28,7 +28,7 @@ object ClientGUIHandler {
 class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends Actor with ActorLogging {
   override def receive: Receive = {
     case ChatMessage(name, message, room) =>
-      val dateTimeFormatter = new SimpleDateFormat("hh:mm  a")
+      val dateTimeFormatter = new SimpleDateFormat("hh:mm:ss a")
       val dateTime = dateTimeFormatter.format(Calendar.getInstance.getTime)
       chatOutputAreas(room).appendText(s"[$dateTime] Message from $name:\n\t$message")
     case ChatNotification(message) =>
@@ -38,6 +38,5 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
       println("accepted " + room)
       Platform.runLater(() => ChatClientWindow.addTab(room))
     case _ =>
-    //      chatOutputAreas(room).appendText("Unknown message received")
   }
 }

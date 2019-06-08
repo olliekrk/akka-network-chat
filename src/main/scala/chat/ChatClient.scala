@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
-import chat.handlers.ClientGUIHandler
+import chat.handlers.{ClientGUIHandler, HubHandler}
 import chat.handlers.ClientGUIHandler.ChatNotification
 
 import scala.util.{Failure, Success}

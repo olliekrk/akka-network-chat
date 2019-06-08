@@ -33,6 +33,10 @@ object GUIStyles {
       "-fx-padding: 12 30 12 30;" +
       "-fx-text-fill: white;" +
       "-fx-font-size: 12px;"
+
+  val commonTextStyle: String =
+    "-fx-font: bold 10pt sans-serif;" +
+      "-fx-background-color: #B6AFAF;"
 }
 
 object ChatClientWindow extends JFXApp {
@@ -45,12 +49,10 @@ object ChatClientWindow extends JFXApp {
   val loginDialog = LoginDialog(stage)
   loginDialog.initializeDialog()
 
-
-
   val chatOutputArea: TextArea = new TextArea {
     editable = false
     focusTraversable = false
-    style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
+    style = GUIStyles.commonTextStyle
   }
 
   val chatInputField: TextField = new TextField {
@@ -142,7 +144,6 @@ object ChatClientWindow extends JFXApp {
   client ! ChatClient.SetUsername(loginDialog.username)
 
   def sendMessage(message: String, room: String): Unit = {
-    println("Sending: " + message + " to room: " + room)
     client ! ChatClient.UserMessage(message, room)
   }
 
@@ -156,12 +157,9 @@ object ChatClientWindow extends JFXApp {
       contentText = "Please enter its name:"
     }
 
-    val result = dialog.showAndWait()
-
-    result match {
-      case Some(name) =>
-        client ! ChatClient.CreateNewRoom(name)
-      case None => println("Room creation was canceled.")
+    dialog.showAndWait() match {
+      case Some(name) => client ! ChatClient.CreateNewRoom(name)
+      case None => println("Room creation dialog was canceled")
     }
   }
 
@@ -173,13 +171,9 @@ object ChatClientWindow extends JFXApp {
       contentText = "Please enter its name:"
     }
 
-    val result = roomJoinDialog.showAndWait()
-
-    result match {
-      case Some(name) =>
-        // todo -> wait for response,
-        client ! ChatClient.JoinNewRoom(name)
-      case None => println("Dialog was canceled.")
+    roomJoinDialog.showAndWait() match {
+      case Some(name) => client ! ChatClient.JoinNewRoom(name)
+      case None => println("Room join dialog was canceled")
     }
   }
 
@@ -192,36 +186,42 @@ object ChatClientWindow extends JFXApp {
     }.showAndWait()
   }
 
-  def addTab(room: String) = {
-            val newTab = new Tab
-            newTab.text = room
+  def addTab(room: String): Unit = {
 
-            val newTextArea = new TextArea {
-              editable = false
-              focusTraversable = false
-              style = "-fx-font: bold 10pt sans-serif; -fx-background-color: #B6AFAF;"
-            }
-            val newTextField = new TextField {
-              text.set("")
-              onKeyPressed = (a: KeyEvent) => a.code match {
-                case KeyCode.Enter =>
-                  val message = text() + "\n"
-                  text.set("")
-                  sendMessage(message, room)
-                case _ =>
-              }
-            }
-            val tabChat: VBox = new VBox {
-              padding = Insets(5)
-              alignment = Pos.TopCenter
-              children = Seq(newTextArea, newTextField)
-            }
-            newTab.content = tabChat
-            newTab.onClosed = handle(client ! ChatClient.LeaveRoom(room))
-            activeRoomsOutput += (room -> newTextArea)
-            activeRoomsInput += (room -> newTextField)
-            tabPane.tabs += newTab
-            println(room)
+    val newTextArea = new TextArea {
+      editable = false
+      focusTraversable = false
+      style = GUIStyles.commonTextStyle
+    }
+
+    val newTextField = new TextField {
+      text.set("")
+      onKeyPressed = (a: KeyEvent) => a.code match {
+        case KeyCode.Enter =>
+          val message = text() + "\n"
+          text.set("")
+          sendMessage(message, room)
+        case _ =>
+      }
+    }
+
+    val tabChat: VBox = new VBox {
+      padding = Insets(5)
+      alignment = Pos.TopCenter
+      children = Seq(newTextArea, newTextField)
+    }
+
+    val newTab = new Tab {
+      text = room
+      content = tabChat
+      onClosed = handle(client ! ChatClient.LeaveRoom(room))
+
+    }
+
+    activeRoomsOutput += (room -> newTextArea)
+    activeRoomsInput += (room -> newTextField)
+    tabPane.tabs += newTab
+    println(room)
   }
 
 }

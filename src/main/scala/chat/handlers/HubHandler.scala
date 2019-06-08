@@ -39,28 +39,29 @@ class HubHandler extends Actor with ActorLogging {
 
   import context.system
 
-  // after registration we have active addresses of clients in hub,
-  // but to prevent from receiving your own messages I am gonna hold  actor ref -> name  map
-  // and send messages only to other clients
   var clientNames = mutable.Map.empty[ActorRef, String]
 
-  val activeConnections: mutable.Map[InetSocketAddress, ActorRef] =
-    mutable.Map.empty[InetSocketAddress, ActorRef]
+  val activeConnections: mutable.Map[InetSocketAddress, ActorRef] = mutable.Map.empty[InetSocketAddress, ActorRef]
 
-  val chatRoomsClients: mutable.Map[String, mutable.Set[InetSocketAddress]] =
-    mutable.HashMap.empty[String, mutable.Set[InetSocketAddress]]
+  val chatRoomsClients: mutable.Map[String, mutable.Set[InetSocketAddress]] = mutable.HashMap.empty[String, mutable.Set[InetSocketAddress]]
+
+  val clientsChatRooms: mutable.Map[InetSocketAddress, mutable.Set[String]] = mutable.HashMap.empty[InetSocketAddress, mutable.Set[String]]
 
   // initialize default room
   chatRoomsClients += (HubHandler.defaultRoomName -> mutable.LinkedHashSet[InetSocketAddress]())
-
-  val clientsChatRooms: mutable.Map[InetSocketAddress, mutable.Set[String]] =
-    mutable.HashMap.empty[InetSocketAddress, mutable.Set[String]]
 
   def serializeAndWrite(request: MessageRequest, connectionActor: ActorRef): Unit = {
     request.serializeByteString match {
       case Success(serializedRequest) => connectionActor ! Write(serializedRequest)
       case Failure(e) => log.info(s"Message serialization has failed with: ${e.toString}")
     }
+  }
+
+  def broadcastMessage(senderName: String, message: String, roomName: String): Unit = {
+    val requestMap = Map("room" -> roomName, "sender" -> senderName, "message" -> message)
+    val request = Message.prepareRequest(Message.OtherClientMessage, requestMap)
+    log.info(s"Broadcasting message from $senderName")
+    chatRoomsClients(roomName).foreach({ addr => serializeAndWrite(request, activeConnections(addr)) })
   }
 
   override def receive: Receive = {
@@ -109,7 +110,6 @@ class HubHandler extends Actor with ActorLogging {
       else {
         clientsChatRooms(senderAddress) += roomName
         chatRoomsClients += (roomName -> mutable.LinkedHashSet[InetSocketAddress](senderAddress))
-        activeConnections(senderAddress) ! ChatNotification(s"Chat room with name '$roomName' created")
         val requestMap = Map("room" -> roomName)
         val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
         serializeAndWrite(request, activeConnections(senderAddress))
@@ -182,7 +182,7 @@ class HubHandler extends Actor with ActorLogging {
               if (!(clientNames contains sender())) {
                 clientNames(sender()) = name
               }
-              self ! Broadcast(new InetSocketAddress("somewhere", 0), name, msg, roomName) //TODO: same Inet fix
+              this.broadcastMessage(name, msg, roomName)
             case Message.CreateRoom =>
               val roomName = value("room").asInstanceOf[String]
 
