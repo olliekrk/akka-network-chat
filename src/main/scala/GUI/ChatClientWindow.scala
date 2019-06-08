@@ -7,8 +7,8 @@ import akka.actor.{ActorRef, ActorSystem}
 import chat.ChatClient
 import chat.handlers.{ClientGUIHandler, HubHandler}
 import scalafx.Includes._
-import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
+import scalafx.application.{JFXApp, Platform}
 import scalafx.event.ActionEvent
 import scalafx.geometry.{Insets, Pos}
 import scalafx.scene.Scene
@@ -156,7 +156,11 @@ object ChatClientWindow extends JFXApp {
       }
     }
 
-    onCloseRequest = _ => client ! ChatClient.UserUnregister
+    onCloseRequest = _ => {
+      client ! ChatClient.UserUnregister
+      Platform.exit()
+      sys.exit()
+    }
   }
 
   client ! ChatClient.SetUsername(loginDialog.username)

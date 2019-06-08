@@ -5,8 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.io.Tcp
 import akka.io.Tcp.{PeerClosed, Received, Write}
-import chat.{Message, RequestSerialization}
-import chat.Message.MessageRequest
+import chat.{MessageRequest, RequestSerialization}
 
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -40,33 +39,33 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
 
   override def handleDeserializedRequest(connectionActor: ActorRef, messageRequest: MessageRequest): Unit = {
     messageRequest.request match {
-      case Message.ClientMessage =>
+      case MessageRequest.ClientMessage =>
         val msg = messageRequest("message").asInstanceOf[String]
         val name = messageRequest("name").asInstanceOf[String]
         val roomName = messageRequest("room").asInstanceOf[String]
         clientNames(connectionActor) = name
         broadcastRoom(name, msg, roomName)
 
-      case Message.CreateRoom =>
+      case MessageRequest.CreateRoom =>
         val roomName = messageRequest("room").asInstanceOf[String]
         for ((key, value) <- activeConnections)
           if (connectionActor == value)
             createRoom(key, roomName)
 
-      case Message.JoinRoom =>
+      case MessageRequest.JoinRoom =>
         val roomName = messageRequest("room").asInstanceOf[String]
         for ((key, value) <- activeConnections)
           if (connectionActor == value)
             doJoinRoom(key, roomName)
 
-      case Message.LeaveRoom =>
+      case MessageRequest.LeaveRoom =>
         val name = messageRequest("name").asInstanceOf[String]
         val roomName = messageRequest("room").asInstanceOf[String]
         for ((key, value) <- activeConnections)
           if (connectionActor == value)
             doLeaveRoom(key, name, roomName)
 
-      case Message.Unregister =>
+      case MessageRequest.Unregister =>
         for ((address, actor) <- activeConnections)
           if (connectionActor == actor)
             self ! HubHandler.Unregister(address)
@@ -94,7 +93,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
     log.info(s"Broadcasting message from $senderName in '$roomName'")
 
     val requestMap = Map("room" -> roomName, "sender" -> senderName, "message" -> message)
-    val request = Message.prepareRequest(Message.OtherClientMessage, requestMap)
+    val request = MessageRequest.prepareRequest(MessageRequest.OtherClientMessage, requestMap)
     serializeAndWriteRoom(request, roomName)
   }
 
@@ -103,7 +102,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       log.warning(s"Attempt to create room '$roomName' which already exist")
 
       val requestMap = Map("message" -> s"Chat room with name '$roomName' already exists")
-      val request = Message.prepareRequest(Message.ChatNotification, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.ChatNotification, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
     }
     else {
@@ -113,7 +112,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       log.info(s"Chat room with name '$roomName' has been created")
 
       val requestMap = Map("room" -> roomName)
-      val request = Message.prepareRequest(Message.AcceptCreateRoom, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.AcceptCreateRoom, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
     }
   }
@@ -122,14 +121,14 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
     //if such room does not exist
     if (!chatRoomsClients.keySet.contains(roomName)) {
       val requestMap = Map("message" -> s"Chat room with name '$roomName' does not exist")
-      val request = Message.prepareRequest(Message.ChatNotification, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.ChatNotification, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
     }
 
     //if the sender is already a member of such room
     else if (clientsChatRooms(senderAddress) contains roomName) {
       val requestMap = Map("message" -> s"You are already member of: '$roomName' ")
-      val request = Message.prepareRequest(Message.ChatNotification, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.ChatNotification, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
     }
 
@@ -140,12 +139,12 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       log.info(s"Client $senderAddress has joined the room '$roomName'")
 
       val requestMap = Map("room" -> roomName)
-      val request = Message.prepareRequest(Message.AcceptJoinRoom, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.AcceptJoinRoom, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
 
       val name = clientNames(activeConnections(senderAddress))
       val notifyMap = Map("room" -> roomName, "message" -> s"$name has joined the room")
-      val notifyRequest = Message.prepareRequest(Message.RoomNotification, notifyMap)
+      val notifyRequest = MessageRequest.prepareRequest(MessageRequest.RoomNotification, notifyMap)
       serializeAndWriteRoom(notifyRequest, roomName)
     }
   }
@@ -166,7 +165,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       log.info(s"$senderName has left '$roomName'")
 
       val requestMap = Map("room" -> roomName, "message" -> s"$senderName has left the room")
-      val request = Message.prepareRequest(Message.RoomNotification, requestMap)
+      val request = MessageRequest.prepareRequest(MessageRequest.RoomNotification, requestMap)
       serializeAndWriteRoom(request, roomName)
 
       //if there are no members left delete that room
@@ -198,7 +197,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       log.warning("Hub request handler not yet implemented")
 
     case Received(data) =>
-      Message.MessageRequest.deserializeByteString(data) match {
+      MessageRequest.deserializeByteString(data) match {
         case Success(value) => handleDeserializedRequest(sender(), value)
         case Failure(_) => log.info("Message deserialization has failed")
       }

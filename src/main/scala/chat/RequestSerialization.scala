@@ -1,7 +1,6 @@
 package chat
 
 import akka.actor.ActorRef
-import chat.Message.MessageRequest
 
 trait RequestSerialization {
 
