@@ -189,18 +189,13 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
   }
 
   def unregisterClient(senderAddress: InetSocketAddress): Unit = {
+    val senderName = clientNames(activeConnections(senderAddress))
+    clientsChatRooms(senderAddress).foreach { roomName => doLeaveRoom(senderAddress, senderName, roomName) }
+
     clientNames -= activeConnections(senderAddress)
     activeConnections -= senderAddress
     clientsChatRooms -= senderAddress
-    chatRoomsClients.foreach {
-      case (roomName, roomMembers) =>
-        roomMembers -= senderAddress
-        if (roomMembers.isEmpty) chatRoomsClients -= roomName
-    }
     log.info(s"Chat client has been unregistered: $senderAddress")
-
-    //    case _: HubHandler.HubRequest =>
-    //      log.warning("Hub request handler not yet implemented")
   }
 
   override def receive: Receive = {
