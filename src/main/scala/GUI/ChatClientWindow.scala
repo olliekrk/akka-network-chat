@@ -244,4 +244,16 @@ object ChatClientWindow extends JFXApp {
     activeRoomsInput += (room -> newTextField)
     tabPane.tabs += newTab
   }
+
+
+  def wrongNameAction(message: String): Unit = {
+
+    warningDialog(message)
+    Thread.sleep(500)
+    client ! ChatClient.UserUnregister
+    Platform.exit()
+    sys.exit()
+
+
+  }
 }

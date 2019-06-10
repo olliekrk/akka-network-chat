@@ -53,7 +53,7 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
       chatOutputAreas(room).appendText(s"(!) [$getDateTimeStamp]:\t$message\n")
 
     case NameInUse(message) =>
-      Platform.runLater(() => ChatClientWindow.warningDialog(message))
+      Platform.runLater(() => ChatClientWindow.wrongNameAction(message))
 
     case _ =>
   }

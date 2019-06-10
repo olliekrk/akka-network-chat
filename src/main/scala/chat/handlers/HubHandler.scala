@@ -43,7 +43,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
         val msg = messageRequest("message").asInstanceOf[String]
         val name = messageRequest("name").asInstanceOf[String]
         val roomName = messageRequest("room").asInstanceOf[String]
-//        clientNames(connectionActor) = name
+        //        clientNames(connectionActor) = name
         broadcastRoom(name, msg, roomName)
 
       case MessageRequest.CreateRoom =>
@@ -68,10 +68,9 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       case MessageRequest.Unregister =>
         for ((address, actor) <- activeConnections)
           if (connectionActor == actor)
-            self ! HubHandler.Unregister(address)
+            unregisterClient(address)
       case MessageRequest.SetUserName =>
         val name = messageRequest("name").asInstanceOf[String]
-        println("VERYFING")
         for ((key, value) <- activeConnections)
           if (connectionActor == value)
             verifyName(connectionActor, key, name)
@@ -103,11 +102,11 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
   }
 
   def verifyName(actor: ActorRef, senderAddress: InetSocketAddress, name: String): Unit = {
-    if (clientNames.values.exists(_ == name)){
+    if (clientNames.values.exists(_ == name)) {
       val requestMap = Map("message" -> s"Your name: $name is already used, try again")
       val request = MessageRequest.prepareRequest(MessageRequest.UsedName, requestMap)
       serializeAndWrite(request, activeConnections(senderAddress))
-    }else{
+    } else {
       clientNames(actor) = name
     }
   }
@@ -189,6 +188,21 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
     }
   }
 
+  def unregisterClient(senderAddress: InetSocketAddress): Unit = {
+    clientNames -= activeConnections(senderAddress)
+    activeConnections -= senderAddress
+    clientsChatRooms -= senderAddress
+    chatRoomsClients.foreach {
+      case (roomName, roomMembers) =>
+        roomMembers -= senderAddress
+        if (roomMembers.isEmpty) chatRoomsClients -= roomName
+    }
+    log.info(s"Chat client has been unregistered: $senderAddress")
+
+    //    case _: HubHandler.HubRequest =>
+    //      log.warning("Hub request handler not yet implemented")
+  }
+
   override def receive: Receive = {
     case HubHandler.Register(remoteAddress, connection) =>
       log.info(s"Trying to register new client: $remoteAddress")
@@ -201,19 +215,6 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
       chatRoomsClients(HubHandler.defaultRoomName).add(remoteAddress)
       log.info(s"New chat client has been registered: $remoteAddress")
 
-    case HubHandler.Unregister(senderAddress) =>
-      clientNames -= activeConnections(senderAddress)
-      activeConnections -= senderAddress
-      clientsChatRooms -= senderAddress
-      chatRoomsClients.foreach {
-        case (roomName, roomMembers) =>
-          roomMembers -= senderAddress
-          if (roomMembers.isEmpty) chatRoomsClients -= roomName
-      }
-      log.info(s"Chat client has been unregistered: $senderAddress")
-
-    case _: HubHandler.HubRequest =>
-      log.warning("Hub request handler not yet implemented")
 
     case Received(data) =>
       MessageRequest.deserializeByteString(data) match {
