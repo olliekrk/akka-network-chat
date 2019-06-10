@@ -23,6 +23,8 @@ object ClientGUIHandler {
 
   case class AcceptNewRoom(message: String) extends ClientRequest
 
+  case class NameInUse(message: String) extends ClientRequest
+
   def props(chatOutputAreas: mutable.Map[String, TextArea]) = Props(new ClientGUIHandler(chatOutputAreas))
 
 }
@@ -49,6 +51,9 @@ class ClientGUIHandler(chatOutputAreas: mutable.Map[String, TextArea]) extends A
 
     case RoomNotification(message, room) =>
       chatOutputAreas(room).appendText(s"(!) [$getDateTimeStamp]:\t$message\n")
+
+    case NameInUse(message) =>
+      Platform.runLater(() => ChatClientWindow.warningDialog(message))
 
     case _ =>
   }

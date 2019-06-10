@@ -43,7 +43,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
         val msg = messageRequest("message").asInstanceOf[String]
         val name = messageRequest("name").asInstanceOf[String]
         val roomName = messageRequest("room").asInstanceOf[String]
-        clientNames(connectionActor) = name
+//        clientNames(connectionActor) = name
         broadcastRoom(name, msg, roomName)
 
       case MessageRequest.CreateRoom =>
@@ -69,7 +69,12 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
         for ((address, actor) <- activeConnections)
           if (connectionActor == actor)
             self ! HubHandler.Unregister(address)
-
+      case MessageRequest.SetUserName =>
+        val name = messageRequest("name").asInstanceOf[String]
+        println("VERYFING")
+        for ((key, value) <- activeConnections)
+          if (connectionActor == value)
+            verifyName(connectionActor, key, name)
       case _ =>
         log.info("Deserialization has succeeded, but message content is unknown")
     }
@@ -95,6 +100,16 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
     val requestMap = Map("room" -> roomName, "sender" -> senderName, "message" -> message)
     val request = MessageRequest.prepareRequest(MessageRequest.OtherClientMessage, requestMap)
     serializeAndWriteRoom(request, roomName)
+  }
+
+  def verifyName(actor: ActorRef, senderAddress: InetSocketAddress, name: String): Unit = {
+    if (clientNames.values.exists(_ == name)){
+      val requestMap = Map("message" -> s"Your name: $name is already used, try again")
+      val request = MessageRequest.prepareRequest(MessageRequest.UsedName, requestMap)
+      serializeAndWrite(request, activeConnections(senderAddress))
+    }else{
+      clientNames(actor) = name
+    }
   }
 
   def createRoom(senderAddress: InetSocketAddress, roomName: String): Unit = {

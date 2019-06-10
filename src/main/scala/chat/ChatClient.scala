@@ -35,13 +35,13 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
   import ChatClient._
   import akka.io.Tcp._
   import context.system
-
   import scala.concurrent.duration._
 
   val connectionTimeout: FiniteDuration = 30.seconds
   IO(Tcp) ! Connect(remote, timeout = Some(connectionTimeout))
 
   var clientName: Option[String] = None
+  var serverAddress: Option[ActorRef] = None
 
   override def receive: Receive = {
     case Tcp.CommandFailed(_: Connect) =>
@@ -52,10 +52,10 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
       val connection = sender()
       // deciding who will receive data from the connection
       connection ! Register(self)
+      serverAddress = Some(connection)
 
       log.info(s"Connected successfully to $remote as $localAddress")
       context.become(signingIn(connection, localAddress))
-
     case other => // send back till context changes
       self ! other
   }
@@ -83,6 +83,10 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
         val message = messageRequest("message").asInstanceOf[String]
         listenerGUI ! ClientGUIHandler.ChatNotification(message)
 
+      case MessageRequest.UsedName =>
+        val message = messageRequest("message").asInstanceOf[String]
+        listenerGUI ! ClientGUIHandler.NameInUse(message)
+
       case MessageRequest.AcceptCreateRoom =>
         val roomName = messageRequest("room").asInstanceOf[String]
         listenerGUI ! ClientGUIHandler.AcceptNewRoom(roomName)
@@ -107,6 +111,9 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
       log.info(s"Client name has been set to:\t $name")
       clientName = Some(name)
       context.become(chatting(name, connection, localAddress))
+      val nameRequest = new MessageRequest(MessageRequest.SetUserName)
+      nameRequest("name") = name
+      serializeAndWrite(nameRequest, connection)
     case _ =>
       log.info("Unknown message received while signing in...")
   }

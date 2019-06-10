@@ -9,6 +9,7 @@ import scala.util.Try
 
 object MessageRequest {
 
+  /* it's easy to serialize strings */
   val ClientMessage = "ClientMessage"
   val MessageFromOther = "MessageFromOther"
   val LeaveRoom = "LeaveRoom"
@@ -20,6 +21,8 @@ object MessageRequest {
   val RoomNotification = "RoomNotification"
   val AcceptCreateRoom = "AcceptCreateRoom"
   val AcceptJoinRoom = "AcceptJoinRoom"
+  val SetUserName = "SetUserName"
+  val UsedName = "UsedName"
 
   def serialize(obj: AnyRef)(implicit system: ActorSystem): Try[Array[Byte]] = {
     val serialization = SerializationExtension(system)
