@@ -21,5 +21,6 @@ libraryDependencies ++= javaFXModules.map( m =>
   "org.openjfx" % s"javafx-$m" % "12.0.1" classifier osName
 )
 
-// set the server config as the main class for 'sbt run'
-mainClass in (Compile, run) := Some("chat.ServerMain")
+// set the client config as the main class for 'sbt run'
+mainClass in (Compile, run) := Some("GUI.ChatClientWindow")
+mainClass in (Compile, packageBin) := Some("GUI.ChatClientWindow")

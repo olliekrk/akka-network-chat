@@ -20,9 +20,9 @@ object ServerMain {
     var hostname = "localhost"
     var server_port = 8888
 
-    if (args.length >= 3) {
-      hostname = args(1)
-      server_port = args(2).toInt
+    if (args.length >= 2) {
+      hostname = args(0)
+      server_port = args(1).toInt
     }
 
     val serverAddress = new InetSocketAddress(hostname, server_port)
