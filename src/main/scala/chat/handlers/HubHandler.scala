@@ -43,7 +43,6 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
         val msg = messageRequest("message").asInstanceOf[String]
         val name = messageRequest("name").asInstanceOf[String]
         val roomName = messageRequest("room").asInstanceOf[String]
-        //        clientNames(connectionActor) = name
         broadcastRoom(name, msg, roomName)
 
       case MessageRequest.CreateRoom =>
@@ -202,7 +201,7 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
     case HubHandler.Register(remoteAddress, connection) =>
       log.info(s"Trying to register new client: $remoteAddress")
 
-      // deciding who will be handling data incoming from new connection
+      // handler will be receiving further messages from new connection
       connection ! Tcp.Register(self)
 
       activeConnections += (remoteAddress -> connection)

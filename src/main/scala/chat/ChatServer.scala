@@ -9,7 +9,7 @@ import chat.handlers.HubHandler
 
 object ChatServer {
 
-  //provide IP address and port number
+  //provide IP address and port number to listen on
   def props(address: InetSocketAddress): Props =
     Props(new ChatServer(address))
 
@@ -23,11 +23,6 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
 
   IO(Tcp) ! Bind(self, address)
 
-  /*
-    The manager replies either with a Tcp.CommandFailed
-    or the actor handling the listen socket
-    replies with a Tcp.Bound message
-   */
   override def receive: Receive = {
     case b@Bound(actualAddress) =>
       log.info("Chat server has started at address: " + actualAddress.toString)
@@ -37,15 +32,11 @@ class ChatServer(address: InetSocketAddress) extends Actor with ActorLogging {
       log.warning("Received fail message. Shutting down the chat server.")
       context stop self
 
-    /*
-      In order to activate the new connection a Register message
-      must be sent to the connection actor, informing that one
-      about who shall receive data from the socket.
-    */
     case Connected(remote, local) =>
       log.info(s"Receiving connection from remote: $remote to the local address: $local")
-      hub ! HubHandler.Register(remote, sender())
+      hub ! HubHandler.Register(remote, sender()) // Handler will send Tcp.Register after successful registration
       log.info("New client will be assigned to default room")
+
     case _ =>
       log.info("Server has received unknown message!")
 

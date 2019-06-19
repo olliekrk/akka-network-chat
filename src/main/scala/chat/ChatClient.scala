@@ -50,13 +50,12 @@ class ChatClient(remote: InetSocketAddress, listenerGUI: ActorRef) extends Actor
 
     case Tcp.Connected(`remote`, localAddress) =>
       val connection = sender()
-      // deciding who will receive data from the connection
       connection ! Register(self)
       serverAddress = Some(connection)
 
       log.info(s"Connected successfully to $remote as $localAddress")
       context.become(signingIn(connection, localAddress))
-    case other => // send back till context changes
+    case other => // send back till context change
       self ! other
   }
 

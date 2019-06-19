@@ -21,6 +21,7 @@ import scalafx.scene.text.Text
 
 import scala.collection.mutable
 
+// styles for improving GUI
 object GUIStyles {
   val richButtonStyle: String =
     "-fx-background-color:" +
@@ -244,7 +245,6 @@ object ChatClientWindow extends JFXApp {
     activeRoomsInput += (room -> newTextField)
     tabPane.tabs += newTab
   }
-
 
   def wrongNameAction(message: String): Unit = {
 

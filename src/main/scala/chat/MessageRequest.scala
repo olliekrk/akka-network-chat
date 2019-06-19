@@ -9,7 +9,7 @@ import scala.util.Try
 
 object MessageRequest {
 
-  /* it's easy to serialize strings */
+  // string enums to distinguish serialized requests
   val ClientMessage = "ClientMessage"
   val MessageFromOther = "MessageFromOther"
   val LeaveRoom = "LeaveRoom"
