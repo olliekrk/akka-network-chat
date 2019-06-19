@@ -20,3 +20,6 @@ lazy val javaFXModules = Seq("base", "controls", "fxml", "graphics", "media", "s
 libraryDependencies ++= javaFXModules.map( m =>
   "org.openjfx" % s"javafx-$m" % "12.0.1" classifier osName
 )
+
+// set the server config as the main class for 'sbt run'
+mainClass in (Compile, run) := Some("chat.ServerMain")
