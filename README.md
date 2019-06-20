@@ -19,6 +19,11 @@ Client can create new room, join existing room, communicate with people.
   <img src="https://user-images.githubusercontent.com/37248877/59854506-5b12ed80-9373-11e9-92d0-2cfc4c2c5f8e.png" alt="chatscreen"/>
 </p>
 
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/37248877/59857309-f5c1fb00-9378-11e9-81bb-45f64e4522ec.png" alt="chatscreen"/>
+</p>
+
+
 ### Constraints
 
 * There cannot be two rooms with the same name.
