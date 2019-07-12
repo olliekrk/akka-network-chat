@@ -68,11 +68,13 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
         for ((address, actor) <- activeConnections)
           if (connectionActor == actor)
             unregisterClient(address)
+
       case MessageRequest.SetUserName =>
         val name = messageRequest("name").asInstanceOf[String]
         for ((key, value) <- activeConnections)
           if (connectionActor == value)
             verifyName(connectionActor, key, name)
+
       case _ =>
         log.info("Deserialization has succeeded, but message content is unknown")
     }
@@ -87,7 +89,9 @@ class HubHandler extends Actor with ActorLogging with RequestSerialization {
 
   def serializeAndWriteRoom(request: MessageRequest, roomName: String): Unit = {
     request.serializeByteString match {
-      case Success(serializedRequest) => chatRoomsClients(roomName).foreach({ addr => activeConnections(addr) ! Write(serializedRequest) })
+      case Success(serializedRequest) => chatRoomsClients(roomName)
+        .filter(activeConnections.contains)
+        .foreach(addr => activeConnections(addr) ! Write(serializedRequest))
       case Failure(e) => log.info(s"Message serialization has failed with: ${e.toString}")
     }
   }
